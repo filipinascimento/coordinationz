@@ -29,6 +29,7 @@ supp.pdf
 
 # Jupyter
 .ipynb_checkpoints/
+.ipynb_checkpoints/*
 
 # Snakemake
 .snakemake
@@ -106,7 +107,7 @@ data/Derived/
 #docs/
 heuristics/
 #data/
-.ipynb_checkpoints/
+.ipynb_checkpoints
 *.model
 *.png
 
@@ -114,9 +115,9 @@ heuristics/
 
 ## data, plots and models
 !script/notebooks/
-script/notebooks/bert/data/*
-script/notebooks/bert/models/*
-script/notebooks/bert/plots/*
+script/notebooks/data/*
+script/notebooks/models/*
+script/notebooks/plots/*
 
 script/notebooks/doc2vec/data/*
 script/notebooks/doc2vec/models/*
