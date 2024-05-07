@@ -1,0 +1,46 @@
+[build-system]
+requires = ["flit"]
+build-backend = "flit.buildapi"
+
+[project]
+name =  "coordinationz"
+authors = [
+    {name = "Filipi N. Silva", email = "filipinascimento@gmail.com"},
+    # other authors Manita, David, Lake, etc
+]
+description = "Package to create networks for detecting coordination in social media."
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11"
+]
+requires-python = ">=3.8.1"
+dynamic = ["version"]
+dependencies = [
+  "numpy",
+  "scipy",
+  "tqdm",
+  "toml"
+]
+
+
+[project.urls]
+Documentation = "https://github.com/filipinascimento/coordinationz"
+Source = "https://github.com/filipinascimento/coordinationz"
+Tracker = "https://github.com/filipinascimento/coordinationz/issues"
+
+[tool.flit.module]
+name = "coordinationz"
+
+[tool.bandit]
+exclude_dirs = ["build","dist","tests","scripts"]
+number = 4
+recursive = true
+targets = "coordinationz"
+

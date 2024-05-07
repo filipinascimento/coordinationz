@@ -1,69 +1,31 @@
-# LaTeX
-*.aux
-*.bbl
-*.blg
-*.bcf
-*.synctex.gz
-*.toc
-*blx.bib
-*.fls
-*.fdb_latexmk
-*.out
-*.run.xml
-main.pdf
-supp.pdf
-*.log
-
-# Data files
-*.csv
-*.tsv
-*.txt
-
-# Office files
-*.docx
-*.doc
-*.ppt
-*.pptx
-*.xls
-*.xlsx
-
-# Jupyter
-.ipynb_checkpoints/
-.ipynb_checkpoints/*
-
-# Snakemake
-.snakemake
-workflow/config.yaml
-
-# Others
-.DS_Store
-*.un~
-
-###################### Standard Python gitignore
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*$py.class
 
 # C extensions
 *.so
 
 # Distribution / packaging
 .Python
-env/
 build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
+lib/
 lib64/
 parts/
 sdist/
 var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -78,12 +40,16 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
+.nox/
 .coverage
 .coverage.*
 .cache
 nosetests.xml
 coverage.xml
-*,cover
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
 # Translations
 *.mo
@@ -91,6 +57,16 @@ coverage.xml
 
 # Django stuff:
 *.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
 
 # Sphinx documentation
 docs/_build/
@@ -98,38 +74,87 @@ docs/_build/
 # PyBuilder
 target/
 
-data/Raw/
-data/Derived/
-
-#framework
-
-#plots/
-#docs/
-heuristics/
-#data/
+# Jupyter Notebook
 .ipynb_checkpoints
-*.model
-*.png
 
-*.pkl.gz
+# IPython
+profile_default/
+ipython_config.py
 
-## data, plots and models
-!script/notebooks/
-script/notebooks/data/*
-script/notebooks/models/*
-script/notebooks/plots/*
+# pyenv
+.python-version
 
-script/notebooks/doc2vec/data/*
-script/notebooks/doc2vec/models/*
-script/notebooks/doc2vec/plots/*
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
 
-script/notebooks/word_tokenizer/data/*
-script/notebooks/word_tokenizer/models/*
-script/notebooks/word_tokenizer/plots/*
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
 
-script/notebooks/.ipynb_checkpoints/
-script/py_scripts/.ipynb_checkpoints/
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
 
-script/notebooks/bert/.ipynb_checkpoints/
-script/notebooks/doc2vec/.ipynb_checkpoints/
-script/notebooks/word_tokenizer/.ipynb_checkpoints/
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
+
+# Mac Based
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+.snakemake
+.vscode
+/Data
