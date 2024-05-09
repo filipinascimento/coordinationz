@@ -19,7 +19,7 @@ if __name__ == "__main__": # Needed for parallel processing
     dataName = "cuba_082020_tweets"
 
     # Loads data from the evaluation datasets as pandas dataframes
-    dfIO = czexp.loadIODataset(dataName, config=config, flavor="all", minActivities=10)
+    dfIO = czexp.loadIODataset(dataName, config=config, flavor="io", minActivities=10)
 
     # Create a bipartite graph from the retweet data
     bipartiteEdges = czexp.obtainIOBipartiteEdgesRetweets(dfIO)
@@ -30,7 +30,8 @@ if __name__ == "__main__": # Needed for parallel processing
         scoreType=["zscore","pvalue-quantized"], # pvalue-quantized, pvalue, or zscore, 
         pvaluesQuantized=[0.001,0.01,0.05,0.1,0.25,0.5],
         realizations=1000,
-        batchSize=10,
+        idf="smoothlog", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
+        batchSize=100,
         workers=-1,
         minSimilarity = 0.5, # will only consider similarities above 0.5
     )

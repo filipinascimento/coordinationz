@@ -47,7 +47,7 @@ void capsule_cleanup(PyObject *capsule) {
 static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	
 	static char *kwlist[] = {
-		"sortedEdges", "leftCount","rightCount",
+		"sortedEdges", "weights", "leftCount","rightCount",
 		"threshold","leftEdges","returnDictionary",
 		"updateCallback","callbackUpdateInterval", NULL};
 	// sortedEdges: list or nparray (they are sorted by left and then right node indices)
@@ -56,17 +56,22 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	// threshold: float/double
 	PyObject* edgesObject = NULL;
 	PyArrayObject *edgesArray = NULL;
+	
 	PyObject* leftEdgesObject = NULL;
+	PyArrayObject *leftEdgesArray = NULL;
+
+	PyObject* weightsObject = NULL;
+	PyArrayObject *weightsArray = NULL;
+
 	Py_ssize_t leftCount = 0;
 	Py_ssize_t rightCount = 0;
 	double threshold = 0.0;
-	PyArrayObject *leftEdgesArray = NULL;
 	int returnDictionary = 0;
 	PyObject *updateCallback = NULL;
 	Py_ssize_t updateInterval = 0;
 	
 	if (!PyArg_ParseTupleAndKeywords(
-			args, kwds, "O|nndOpOn", kwlist, &edgesObject, &leftCount, &rightCount, &threshold, &leftEdgesObject,&returnDictionary, &updateCallback, &updateInterval)) {
+			args, kwds, "O|OnndOpOn", kwlist, &edgesObject,&weightsObject, &leftCount, &rightCount, &threshold, &leftEdgesObject,&returnDictionary, &updateCallback, &updateInterval)) {
 
 		return NULL;
 	}
@@ -92,19 +97,71 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	// Check if edgesObject is a numpy array
 	if (PyArray_Check(edgesObject)) {
 		// Check if the numpy array is of type int64 and contiguous
-		if (PyArray_TYPE(edgesObject) == NPY_INT64 && PyArray_ISCONTIGUOUS(edgesObject)) {
+		if (PyArray_TYPE(edgesObject) == NPY_INT64 && PyArray_IS_C_CONTIGUOUS(edgesObject)) {
 			edgesArray = (PyArrayObject *)edgesObject;
 			Py_INCREF(edgesArray);
 			// printf("edgesArray is a numpy array of int64 and contiguous...\n");
 		} else {
 			// Convert edgesObject to numpy array of int64
-			edgesArray = (PyArrayObject *)PyArray_FROM_OT(edgesObject, NPY_INT64);
+			edgesArray = (PyArrayObject *)PyArray_FROM_OTF(edgesObject, NPY_INT64, NPY_ARRAY_C_CONTIGUOUS);
 			// printf("Had to convert to array...\n");
 		}
 	} else {
 		// Convert edgesObject to numpy array of int64
-		edgesArray = (PyArrayObject *)PyArray_FROM_OT(edgesObject, NPY_INT64);
+		edgesArray = (PyArrayObject *)PyArray_FROM_OTF(edgesObject, NPY_INT64, NPY_ARRAY_C_CONTIGUOUS);
 		// printf("Not NP array, converting...\n");
+	}
+
+	size_t edgeCount = (size_t)PyArray_SIZE(edgesArray) / 2;
+	npy_int64 *edges = PyArray_DATA(edgesArray);
+
+
+	npy_float64 *weights = NULL;
+
+	if(weightsObject!=NULL && weightsObject!=Py_None){
+		// printf("Weights provided!\n");
+		// // print using python weightsObject
+		PyObject *weightsRepr = PyObject_Repr(weightsObject);
+
+		// convert weightsObject to numpy array of doubles if needed (will be readonly)
+		if (PyArray_Check(weightsObject)) {
+			// Check if the numpy array is of type double and contiguous
+			if (PyArray_TYPE(weightsObject) == NPY_FLOAT64 && PyArray_IS_C_CONTIGUOUS(weightsObject)) {
+				weightsArray = (PyArrayObject *)weightsObject;
+				Py_INCREF(weightsArray);
+				// printf("edgesArray is a numpy array of double and contiguous...\n");
+			} else {
+				// Convert edgesObject to numpy array of int64
+				weightsArray = (PyArrayObject *)PyArray_FROM_OTF(weightsObject, NPY_FLOAT64, NPY_ARRAY_C_CONTIGUOUS);
+				// printf("Had to convert to array...\n");
+			}
+		} else {
+			// Convert edgesObject to numpy array of int64
+			weightsArray = (PyArrayObject *)PyArray_FROM_OTF(weightsObject, NPY_FLOAT64, NPY_ARRAY_C_CONTIGUOUS);
+			// printf("Not NP array, converting...\n");
+		}
+
+
+		
+
+		size_t weightsCount = (size_t)PyArray_SIZE(weightsArray);
+		weights = PyArray_DATA(weightsArray);
+		weightsRepr = PyObject_Repr(weightsArray);
+		// printf("Weights ARRAY: %s\n", PyUnicode_AsUTF8(weightsRepr));
+		
+		// // print weights
+		// printf("\n----------\n");
+		// for (size_t i = 0; i < weightsCount; i++) {
+		// 	// edge: weight
+		// 	printf("|%ld,%ld : ",edges[2 * i], edges[2 * i + 1]);
+		// 	printf("%g", weights[i]);
+		// 	printf("\n");
+		// }
+
+		if(weightsCount!=edgeCount){
+			PyErr_SetString(PyExc_TypeError, "The number of weights must be equal to the number of edges.");
+			return NULL;
+		}
 	}
 	
 	// same for leftEdges but check if it is not NULL, if it is NULL keep it NULL
@@ -119,20 +176,18 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 				// printf("leftEdgesArray is a numpy array of int64 and contiguous...\n");
 			} else {
 				// Convert leftEdgesObject to numpy array of int64
-				leftEdgesArray = (PyArrayObject *)PyArray_FROM_OT(leftEdgesObject, NPY_INT64);
+				leftEdgesArray = (PyArrayObject *)PyArray_FROM_OTF(leftEdgesObject, NPY_INT64, NPY_ARRAY_C_CONTIGUOUS);
 				// printf("Had to convert to array...\n");
 			}
 		} else {
 			// Convert leftEdgesObject to numpy array of int64
-			leftEdgesArray = (PyArrayObject *)PyArray_FROM_OT(leftEdgesObject, NPY_INT64);
+			leftEdgesArray = (PyArrayObject *)PyArray_FROM_OTF(leftEdgesObject, NPY_INT64, NPY_ARRAY_C_CONTIGUOUS);
 			// printf("Not NP array, converting...\n");
 		}
 	}else{
 		leftEdgesObject = NULL;
 	}
 
-	size_t edgeCount = (size_t)PyArray_SIZE(edgesArray) / 2;
-	npy_int64 *edges = PyArray_DATA(edgesArray);
 
 	size_t leftEdgeCount = 0;
 	npy_int64 *leftEdges = NULL;
@@ -144,32 +199,48 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	npy_int64 *leftNodeStartEndIndices = (npy_int64 *)calloc((leftCount+1),sizeof(npy_int64));
 
 	// create multiplicity array countaining for each edge, the number of repetitions
-	npy_int64 *uniqueEdges = (npy_int64 *)calloc((edgeCount*2),sizeof(npy_int64));
-	npy_int64 *uniqueEdgesMultiplicity = (npy_int64 *)calloc((edgeCount),sizeof(npy_int64));
+	npy_int64 *uniqueEdges = calloc((edgeCount*2),sizeof(npy_int64));
+	npy_double *uniqueEdgesWeight = calloc((edgeCount),sizeof(npy_double));
 	size_t uniqueEdgeCount = 0;
 	npy_int64 previousLeftNode = -1;
 	npy_int64 previousRightNode = -1;
+	npy_double previousWeight = -1;
 	size_t multiplicity = 1;
+
 	for (size_t i = 0; i < edgeCount; i++) {
 		npy_int64 leftNode = edges[2 * i];
 		npy_int64 rightNode = edges[2 * i + 1];
+		npy_double weight = 1.0;
+		if(weights){
+			weight = weights[i];
+		}
 		if (leftNode == previousLeftNode && rightNode == previousRightNode) {
 			multiplicity++;
 		} else {
 			if (CVLikely(i != 0)) {
 				uniqueEdges[2 * uniqueEdgeCount] = previousLeftNode;
 				uniqueEdges[2 * uniqueEdgeCount + 1] = previousRightNode;
-				uniqueEdgesMultiplicity[uniqueEdgeCount] = multiplicity;
+				if(weights){
+					uniqueEdgesWeight[uniqueEdgeCount] = previousWeight*(double)multiplicity;
+					// printf("!weight: %g, %ld\n", previousWeight,multiplicity);
+				}else{
+					uniqueEdgesWeight[uniqueEdgeCount] = (double)multiplicity;
+				}
 				uniqueEdgeCount++;
 			}
 			previousLeftNode = leftNode;
 			previousRightNode = rightNode;
+			previousWeight = weight;
 			multiplicity = 1;
 		}
 		if(CVUnlikely(i == edgeCount-1)) {
 			uniqueEdges[2 * uniqueEdgeCount] = leftNode;
 			uniqueEdges[2 * uniqueEdgeCount + 1] = rightNode;
-			uniqueEdgesMultiplicity[uniqueEdgeCount] = multiplicity;
+			if(weights){
+				uniqueEdgesWeight[uniqueEdgeCount] = weight*(double)multiplicity;
+			}else{
+				uniqueEdgesWeight[uniqueEdgeCount] = multiplicity;
+			}
 			uniqueEdgeCount++;
 		}
 	}
@@ -181,7 +252,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	// for (size_t i = 0; i < uniqueEdgeCount; i++) {
 	// 	npy_int64 leftNode = uniqueEdges[2 * i];
 	// 	npy_int64 rightNode = uniqueEdges[2 * i + 1];
-	// 	printf("%ld %ld: %ld\n", leftNode, rightNode, uniqueEdgesMultiplicity[i]);
+	// 	printf("%ld %ld: %g\n", leftNode, rightNode, uniqueEdgesWeight[i]);
 	// }
 	
 	// loop over edges and find the start and end indices of each left node
@@ -247,7 +318,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 		size_t leftNodeEnd = leftNodeStartEndIndices[i + 1];
 		double normalizationFactorValue = 0.0;
 		for (size_t j = leftNodeStart; j < leftNodeEnd; j++) {
-			normalizationFactorValue += uniqueEdgesMultiplicity[j] * uniqueEdgesMultiplicity[j];
+			normalizationFactorValue += uniqueEdgesWeight[j] * uniqueEdgesWeight[j];
 		}
 		normalizationFactor[i] = 1.0 / sqrt(normalizationFactorValue);
 		// printf("%ld: %f\n", i, normalizationFactor[i]);
@@ -317,7 +388,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 					npy_int64 rightNode1 = uniqueEdges[2 * leftNode1Index + 1];
 					npy_int64 rightNode2 = uniqueEdges[2 * leftNode2Index + 1];
 					if (rightNode1 == rightNode2) { 
-						dotProduct += uniqueEdgesMultiplicity[leftNode1Index] * uniqueEdgesMultiplicity[leftNode2Index];
+						dotProduct += uniqueEdgesWeight[leftNode1Index] * uniqueEdgesWeight[leftNode2Index];
 						leftNode1Index++;
 						leftNode2Index++;
 					} else if (rightNode1 < rightNode2) {
@@ -391,7 +462,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 					npy_int64 rightNode1 = uniqueEdges[2 * leftNode1Index + 1];
 					npy_int64 rightNode2 = uniqueEdges[2 * leftNode2Index + 1];
 					if (rightNode1 == rightNode2) { 
-						dotProduct += uniqueEdgesMultiplicity[leftNode1Index] * uniqueEdgesMultiplicity[leftNode2Index];
+						dotProduct += uniqueEdgesWeight[leftNode1Index] * uniqueEdgesWeight[leftNode2Index];
 						leftNode1Index++;
 						leftNode2Index++;
 					} else if (rightNode1 < rightNode2) {
@@ -426,13 +497,18 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 
 
 	Py_XDECREF(edgesArray);
+
 	if(leftEdgesArray != NULL) {
 		Py_XDECREF(leftEdgesArray);
 	}
 
+	if(weightsArray != NULL) {
+		Py_XDECREF(weightsArray);
+	}
+
 	free(normalizationFactor);
 	free(uniqueEdges);
-	free(uniqueEdgesMultiplicity);
+	free(uniqueEdgesWeight);
 	free(leftNodeStartEndIndices);
 
 	if(errorOccured) {

@@ -30,18 +30,23 @@ if __name__ == "__main__": # Needed for parallel processing
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
         scoreType=["zscore","pvalue-quantized"], # pvalue-quantized, pvalue, or zscore, 
-        pvaluesQuantized=[0.001,0.01,0.05,0.1,0.25,0.5],
-        realizations=100000,
-        batchSize=100,
+        pvaluesQuantized=[0.0001,0.001,0.01,0.05,0.1,0.25,0.5],
+        realizations=1000000,
+        batchSize=1000,
+        idf="smoothlog", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         workers=-1,
-        minSimilarity = 0.3, # will only consider similarities above 0.3
+        minSimilarity = 0.4, # will only consider similarities above that
+        returnDegreeValues=True, # will return the degrees of the nodes
     )
 
     # Create a network from the null model output with a pvalue threshold of 0.05
     g = cz.network.createNetworkFromNullModelOutput(
         nullModelOutput,
-        pvalueThreshold=0.05, # only keep edges with pvalue < 0.05
+        # useZscoreWeights = True,
+        # usePValueWeights = True,
+        pvalueThreshold=0.01, # only keep edges with pvalue < 0.05
     )
+
 
     xn.save(g, networksPath/f"{dataName}_coretweet.xnet")
 

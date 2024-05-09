@@ -14,8 +14,16 @@ def _make_pbar(desc=None):
     return inner
 
 
-def bipartiteCosine(indexedEdges, leftCount=None, rightCount=None, threshold=0.0,
-           leftEdges=None, returnDictionary = False, updateCallback=None, callbackUpdateInterval=0):
+def bipartiteCosine(indexedEdges,
+                    weights=None,
+                    leftCount=None,
+                    rightCount=None,
+                    # idf=None, # None, "none", "linear", "smooth", "log", "log1p",
+                    threshold=0.0,
+                    leftEdges=None,
+                    returnDictionary = False,
+                    updateCallback=None,
+                    callbackUpdateInterval=0):
     """
     Calculate the cosine similarity matrix of a bipartite graph
     given the indexed edges of the bipartite graph.
@@ -24,6 +32,9 @@ def bipartiteCosine(indexedEdges, leftCount=None, rightCount=None, threshold=0.0
     ----------
     indexedEdges: np.ndarray
         The indexed edges of the bipartite graph
+    # weights: np.ndarray
+    #     The weights of the edges in the bipartite graph
+    #     default: None (all weights are 1)
     leftCount: int
         The number of nodes on the left side of the bipartite graph
         default: maximum index of the indexedEdges[:, 0] + 1
@@ -36,6 +47,16 @@ def bipartiteCosine(indexedEdges, leftCount=None, rightCount=None, threshold=0.0
     leftEdges: np.ndarray or list of 2 element tuples (optional)
         Will only calculate the cosine similarity of the leftEdges pairs
         default: None (calculate all pairs)
+    idf: str or None
+        The type of idf to use for the cosine similarity.
+        Can be:
+         - None or "none" for no idf
+         - "linear" for an idf term of totalFreq/freq
+         - "smoothlinear" for an idf term of (totalFreq+1)/(freq+1)
+         - "log" for an idf term of log(totalFreq/freq)
+         - "smoothlog for an idf term of log((totalFreq)/(freq+1)+1)
+        default: None
+
     returnDictionary: bool
         If True, return a dictionary of the cosine similarities
         default: False
@@ -71,13 +92,18 @@ def bipartiteCosine(indexedEdges, leftCount=None, rightCount=None, threshold=0.0
     # edge = left * rightCount + right
     encodedEdges = indexedEdges[:, 0] * rightCount + indexedEdges[:, 1]
 
-    encodedEdges.sort()
+    indices = np.argsort(encodedEdges)
+    encodedEdges = encodedEdges[indices]
     decodedEdges = np.zeros((edgesCount, 2), dtype=np.int64)
     decodedEdges[:, 0] = encodedEdges // rightCount
     decodedEdges[:, 1] = encodedEdges % rightCount
-    
+
+    if(weights is not None):
+        weights = np.array(weights)[indices]
+
 
     return _cosine_core(decodedEdges,
+                        weights=weights,
                         leftCount=leftCount,
                         rightCount=rightCount,
                         threshold=threshold,
