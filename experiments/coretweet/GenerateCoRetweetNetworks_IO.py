@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 import coordinationz as cz
 import xnetwork as xn
 import coordinationz.experiment_utilities as czexp
-
+import networkx as nx
 
 if __name__ == "__main__": # Needed for parallel processing
     config = cz.config
