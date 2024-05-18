@@ -165,3 +165,4 @@ jobs/
 *.job
 *.out
 plots/
+data/
