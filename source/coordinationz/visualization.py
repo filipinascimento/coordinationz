@@ -186,3 +186,95 @@ def ccdf(parameters):
               transparent=False)
         
     plt.show()
+    
+    
+def scatter_plot(parameters):
+    '''
+    Plots the scatterplot
+    
+    :param parameters: parameters for the plot
+    '''
+    
+    # parameters =  {
+    #     'data': df_jaccard,
+    #     'fontsize': 14,
+    #     'columns': {
+    #         'x': 'ratio',
+    #         'y': 'count_total_replies',
+    #     },
+    #     'alpha': 0.5,
+    #     'marker_size': 5,
+    #     'marker': None,
+    #     'xlabel': 'Jaccard coefficent \n (for each IO account, each poster)',
+    #     'ylabel': 'Number of daily tweets from poster  ',
+    #     'legend_location': '',
+    #     'log_yscale': False,
+    #     'log_xscale': False,
+    #     'bins': None,
+    #     'title': f'{year}_{campaign}_per_poster_per_tweet_1day',
+    #     'save': {
+    #         'path': f'{time_plot_path}',
+    #         'filename': f'{year}_{campaign}_jaccard_1day.png'
+    #     },
+    # }
+    
+    keys = parameters.keys()
+    
+    if 'size' in keys:
+        size = parameters['size']
+    else:
+        size = (8,8)
+        
+    fig, ax = plt.subplots(figsize=size)
+    fontsize = parameters['fontsize']
+    
+    colors = ['blue', 'red', 'green', 'orange', 'olive', 'pink', 'lime', 'maroon']
+    symbols = ['.', 'o', '+', 'x', '*', 'v', '^', '>']
+    
+    x_column = parameters['columns']['x']
+    y_column = parameters['columns']['y']
+    data = parameters['data']
+    color = colors[0]
+    
+    alpha = parameters['alpha'] if 'alpha' in keys else 0.5
+    marker_size = parameters['marker_size'] if 'marker_size' in keys else 3
+    
+    if 'marker' in keys:
+        marker = symbols[1]
+    else:
+        marker = symbols[0]
+        
+    ax.scatter(data[x_column], 
+               data[y_column], 
+               marker_size, 
+               c=color, 
+               alpha=alpha, 
+               marker=marker,
+           label="Luck")
+
+    ax.set_xlabel(parameters['xlabel'], 
+                  fontsize=fontsize)
+    ax.set_ylabel(parameters['ylabel'], 
+                  fontsize=fontsize)
+
+    ax.tick_params(axis='both', labelsize=fontsize) 
+    
+    if 'log_yscale' in keys and parameters['log_yscale'] == True:
+        ax.set_yscale('log')
+    if 'log_xscale' in keys and parameters['log_xscale'] == True:
+        ax.set_xscale('log')
+        
+    if 'title' in keys:
+        plt.title(parameters['title'])
+
+    if 'save' in keys:
+        path = parameters['save']['path']
+        filename = parameters['save']['filename']
+        
+        file_path = os.path.join(path, filename)
+        
+        fig.savefig(f'{file_path}', 
+              facecolor='white', 
+              transparent=False)
+        
+    plt.show()
