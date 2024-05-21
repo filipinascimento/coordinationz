@@ -1,3 +1,7 @@
+# For HPC
+import os
+os.environ['OPENBLAS_NUM_THREADS']='1'
+
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -5,26 +9,25 @@ from tqdm.auto import tqdm
 import coordinationz as cz
 import xnetwork as xn
 import coordinationz.experiment_utilities as czexp
+from pathlib import Path
 
 
-if __name__ == "__main__": # Needed for parallel processing
-    config = cz.config
-    tqdm.pandas()
-    # config = cz.load_config("<path to config>")
-    
-    networksPath = Path(config["paths"]["NETWORKS"]).resolve()
-    networksPath.mkdir(parents=True, exist_ok=True)
+def obtainEvaluationBipartiteEdgescoURL(df):
+    bipartiteEdges = []
+    urls_df = df[df['urls'].apply(lambda x: len(x)>1)]
+    for index,row in urls_df.iterrows():
+        bipartiteEdges += [[row['userid'],url['expanded_url']] for url in row['urls']]
+    return bipartiteEdges
 
+if __name__ == "__main__":
 
-    # dataName = "challenge_filipinos_5DEC"
-    dataName = "challenge_problem_two_21NOV_activeusers"
-    # dataName = "challenge_problem_two_21NOV"
+    df_dir = "/project/muric_789/ashwin/INCAS/processed_data/cuba_082020_tweets_combined.pkl.gz"
+    final_dir ="/project/muric_789/ashwin/INCAS/outputs_cuba_082020"
 
-    # Loads data from the evaluation datasets as pandas dataframes
-    dfEvaluation = czexp.loadEvaluationDataset(dataName, config=config, minActivities=1)
+    dfEvaluation = pd.read_pickle(df_dir,compression='gzip')
 
-    # Create a bipartite graph from the retweet data
-    bipartiteEdges = czexp.obtainEvaluationBipartiteEdgesRetweets(dfEvaluation)
+    # Create a bipartite graph from the courl data
+    bipartiteEdges = obtainEvaluationBipartiteEdgescoURL(dfEvaluation)
 
     # creates a null model output from the bipartite graph
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
@@ -48,5 +51,7 @@ if __name__ == "__main__": # Needed for parallel processing
     )
 
 
-    xn.save(g, networksPath/f"{dataName}_coretweet.xnet")
+    dataName = os.path.basename(df_dir).split('.')[0]
+    final_dir = Path(final_dir)
 
+    xn.save(g, final_dir/f"{dataName}_coURL.xnet")

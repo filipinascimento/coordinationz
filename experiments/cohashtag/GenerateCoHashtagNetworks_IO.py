@@ -7,22 +7,26 @@ import xnetwork as xn
 import coordinationz.experiment_utilities as czexp
 import networkx as nx
 
+def load_data(file):
+    import json
+    
+    with open(file, 'r') as f:
+        json_data = json.load(f)
+
+    return json_data
+    
+    
 if __name__ == "__main__": # Needed for parallel processing
     config = cz.config
     tqdm.pandas()
     # config = cz.load_config("<path to config>")
 
-    networksPath = Path(config["paths"]["NETWORKS"]).resolve()
-    networksPath.mkdir(parents=True, exist_ok=True)
+    # Load JSON data from file
+    cohashtag_0="/N/project/INCAS/merge_network/cuba_bipartite_original_filter_0.json"
+    cohashtag_1="/N/project/INCAS/merge_network/cuba_bipartite_original_filter_10.json"
+    networksPath = "/N/project/INCAS/merge_network/cuba_cohashtag_0.xnet"
     
-
-    dataName = "cuba_082020_tweets"
-
-    # Loads data from the evaluation datasets as pandas dataframes
-    dfIO = czexp.loadIODataset(dataName, config=config, flavor="io", minActivities=10)
-
-    # Create a bipartite graph from the retweet data
-    bipartiteEdges = czexp.obtainIOBipartiteEdgesRetweets(dfIO)
+    bipartiteEdges = load_data(cohashtag_0)
 
     # creates a null model output from the bipartite graph
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
@@ -41,5 +45,5 @@ if __name__ == "__main__": # Needed for parallel processing
         pvalueThreshold=0.05, # only keep edges with pvalue < 0.05
     )
 
-    xn.save(g, networksPath/f"{dataName}_coretweet.xnet")
+    xn.save(g, networksPath)
 

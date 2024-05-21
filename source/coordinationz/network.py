@@ -9,6 +9,8 @@ def createNetworkFromNullModelOutput(nullModelOutput,
                                      similarityThreshold = 0.0,
                                      zscoreThreshold = 0.0,
                                      pvalueThreshold = 1.0,
+                                     useZscoreWeights = False,
+                                     usePValueWeights = False,
                                      showProgress = True):
     """
     Creates a network from the null model output
@@ -56,10 +58,24 @@ def createNetworkFromNullModelOutput(nullModelOutput,
     
     edgeAttributes = {}
     edgeAttributes["weight"] = np.array(nullModelOutput["similarities"])
+
+    if("zscore" in nullModelOutput and useZscoreWeights):
+        edgeAttributes["weight"] = np.array(nullModelOutput["zscores"])
+        # filter nans and set infs to 10
+        edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["weight"], nan=0.0, posinf=10.0, neginf=-10.0)
+    
+    if("pvalues" in nullModelOutput and usePValueWeights):
+        edgeAttributes["weight"] = 1.0-np.array(nullModelOutput["pvalues"])
+        edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["weight"], nan=1.0, posinf=1.0, neginf=1.0)
+
+
     if("zscores" in nullModelOutput):
         edgeAttributes["zscore"] = np.array(nullModelOutput["zscores"])
     if("pvalues" in nullModelOutput):
         edgeAttributes["pvalue"] = np.array(nullModelOutput["pvalues"])
+    
+    if("degrees" in nullModelOutput):
+        vertexAttributes["left_degree"] = np.array(nullModelOutput["degrees"])
 
     if(showProgress):
         progressbar.update(1)

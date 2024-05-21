@@ -158,3 +158,11 @@ Temporary Items
 .snakemake
 .vscode
 /Data
+
+
+#jobs
+jobs/
+*.job
+*.out
+plots/
+data/

@@ -6,6 +6,8 @@ py_sources = files(
     'network.py',
     'config.py',
     'experiment_utilities.py',
+    'cohashtag_helper.py',
+    'visualization.py',
 )
 
 

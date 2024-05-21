@@ -13,30 +13,48 @@ if __name__ == "__main__": # Needed for parallel processing
     networksPath.mkdir(parents=True, exist_ok=True)
 
     bipartiteEdges =[
-        ("A", "a"),
-        ("A", "b"),
-        ("A", "c"),
-        ("A", "d"),
+        # e.g., user, hashtag or user, coretweet_id,
+        # numeric indices can also be used instead of strings
+        ("userA", "a"),
+        ("userA", "b"),
+        ("userA", "c"),
+        ("userA", "d"),
+        ("userA", "e"),
 
-        ("B", "c"),
-        ("B", "d"),
+        ("userB", "c"),
+        ("userB", "d"),
 
-        ("C", "b"),
-        ("C", "b"),
-        ("C", "e"),
-        ("C", "f"),
-        ("C", "g"),
-        ("C", "h"),
-        ("C", "h"),
+        ("userC", "a"),
+        ("userC", "b"),
+        ("userC", "c"),
+        ("userC", "d"),
+        ("userC", "f"),
+        ("userC", "f"),
+        ("userC", "f"),
+        
+        ("userD", "c"),
+        ("userD", "d"),
+        ("userD", "g"),
+        ("userD", "h"),
 
-        ("D", "e"),
-        ("D", "f"),
-        ("D", "g"),
-        ("D", "h"),
+        ("userE", "c"),
+        ("userE", "d"),
+        ("userE", "g"),
+        ("userE", "i"),
+
+        ("userF", "j"),
+        ("userF", "k"),
+        ("userF", "l"),
+        ("userF", "m"),
+
+        ("userG", "j"),
+        ("userG", "k"),
+        ("userG", "l"),
+        ("userG", "o"),
     ]
     
     # scoreType = ["zscore","pvalue"]
-    scoreType = ["zscore","pvalue-quantized"]
+    scoreType = ["zscore","pvalue"]
     # pvalue-quantized is faster than pvalue
     # but pvalues are quantized
 
@@ -44,11 +62,12 @@ if __name__ == "__main__": # Needed for parallel processing
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
         scoreType=scoreType,
-        realizations=1000000,
-        batchSize=1000, # number of realizations to calculate in each process
+        realizations=100000, # number of realizations of the null model, use 0 for no null model
+        batchSize=100, # number of realizations to calculate in each process
         minSimilarity = 0.0, # will first filter out similarities below this value
-        # pvaluesQuantized=[0.01,0.05,0.1,0.25,0.5],
+        pvaluesQuantized=[0.01,0.05,0.1,0.25,0.5],
         # for pvalue-quantized, you can define the p-values of interest
+        idf="smoothlog", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         workers=-1, # -1 to use all available cores, 0 or 1 to use a single core
         returnDegreeSimilarities=True, # will also return the similarities by degree pair
         returnDegreeValues=True, # will return the degrees of the nodes
@@ -74,12 +93,11 @@ if __name__ == "__main__": # Needed for parallel processing
     labels = nullModelOutput["labels"]
 
     # Print the indexed edges and their similarities together with pvalues and zscores
-    # print("\nIndexed Edges -> similarities (p:pvalue) (z:zscore)")
     for i, (edge, similarity) in enumerate(zip(nullModelIndexedEdges, nullModelSimilarities)):
-        reconstructedEdge = [(labels[edge[0]],labels[edge[1]])]
+        labelledEdge = (labels[edge[0]],labels[edge[1]])
         
         printStringList = []
-        printStringList.append(f"{reconstructedEdge} -> {similarity:.3}")
+        printStringList.append(f"{labelledEdge[0]}, {labelledEdge[1]} -> {similarity:.3}")
 
         if(nullModelPvalues):
             pvalue = nullModelPvalues[i]
@@ -93,7 +111,7 @@ if __name__ == "__main__": # Needed for parallel processing
             zscore = nullModelZScores[i]
             zscoreString = f"(z={zscore:.2g})"
             printStringList.append(zscoreString)
-            print(' '.join(printStringList))
+        print(' '.join(printStringList))
     print("")
     
 

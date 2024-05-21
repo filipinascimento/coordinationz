@@ -23,7 +23,9 @@ if __name__ == "__main__": # Needed for parallel processing
     figuresPath.mkdir(parents=True, exist_ok=True)
 
 
+    # dataName = "challenge_filipinos_5DEC"
     dataName = "challenge_problem_two_21NOV_activeusers"
+    # dataName = "challenge_problem_two_21NOV"
 
     # Loads data from the evaluation datasets as pandas dataframes
     dfEvaluation = czexp.loadEvaluationDataset(dataName, config=config, minActivities=1)
@@ -35,8 +37,9 @@ if __name__ == "__main__": # Needed for parallel processing
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
         scoreType="onlynullmodel",
-        realizations=1000000,
-        batchSize=1000,
+        realizations=100000,
+        idf="linear", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
+        batchSize=100,
         workers=-1,
     )
 
