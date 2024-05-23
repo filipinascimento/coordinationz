@@ -109,6 +109,66 @@ def _processBatch(parameters):
 # repetitionCount*realizations = 10000
 
 
+def calculateRightIDFWeights(bipartiteIndexedEdges, leftCount, rightCount, idf):
+    # weights = None
+    right2IDF = None
+    if(idf is not None and idf.lower() != "none"):
+        idfLeftCount = leftCount
+        right2IDF = np.zeros(rightCount, dtype=np.float64)
+        rightCounts = np.zeros(rightCount, dtype=np.float64)
+        # calculate on the Unique right counts
+        # get unique edges
+        bipartiteIndexedUniqueEdges = np.unique(bipartiteIndexedEdges, axis=0)
+        rightBinCounts = np.bincount(bipartiteIndexedUniqueEdges[:, 1])
+        # rightBinCounts = np.bincount(bipartiteIndexedEdges[:, 1])
+        rightCounts[:len(rightBinCounts)] = rightBinCounts
+        if(idf.lower() == "linear"):
+            right2IDF = idfLeftCount / rightCounts# unique
+        elif(idf.lower() == "smoothlinear"):
+            right2IDF = (idfLeftCount + 1) / (rightCounts + 1)
+        elif(idf.lower() == "log"):
+            right2IDF = np.log(idfLeftCount / rightCounts)
+        elif(idf.lower() == "smoothlog"):
+            right2IDF = np.log((idfLeftCount / rightCounts) + 1)
+        else:
+            raise ValueError(f"Invalid idf type: {idf}")
+    return right2IDF
+    #     weights = right2IDF[bipartiteIndexedEdges[:, 1]]
+    #     # print("weights: ",len(weights),"edges: ",len(indexedEdges))
+    # # print("weights:",weights)
+    # return weights
+    
+def calculateIDFWeights(bipartiteIndexedEdges, leftCount, rightCount, idf):
+    right2IDF = calculateRightIDFWeights(bipartiteIndexedEdges, leftCount, rightCount, idf)
+    if(right2IDF is None):
+        return None
+    weights = right2IDF[bipartiteIndexedEdges[:, 1]]
+    return weights
+
+def estimateIDFWeightsShuffled(bipartiteIndexedEdges, leftCount, rightCount, idf, realizations=10000,showProgress=True,workers = 1):
+    avgWeights = np.zeros(len(bipartiteIndexedEdges), dtype=np.float64)
+    # stdWeights = np.zeros(len(bipartiteIndexedEdges), dtype=np.float64)
+    for _ in tqdm(range(realizations),desc="IDF estimation",disable=not showProgress,leave=False):
+        shuffledEdges = bipartiteIndexedEdges.copy()
+        # shuffle only right side
+        np.random.shuffle(shuffledEdges[:,1])
+        right2IDF=calculateRightIDFWeights(shuffledEdges, leftCount, rightCount, idf)
+        if(right2IDF is None):
+            return None
+        nullWeights = right2IDF[bipartiteIndexedEdges[:, 1]]
+        avgWeights += nullWeights
+        # stdWeights += nullWeights**2
+    avgWeights /= realizations
+    # stdWeights = np.sqrt(stdWeights/realizations - avgWeights**2)
+
+    # varCoefficients = stdWeights/avgWeights
+    # print("Average varCoefficients",np.nanmean(varCoefficients))
+    # print("Max varCoefficients",np.nanmax(varCoefficients))
+    # print("Min varCoefficients",np.nanmin(varCoefficients))
+    # print("Median varCoefficients",np.nanmedian(varCoefficients))
+    # print("Std varCoefficients",np.nanstd(varCoefficients))
+    
+    return avgWeights
 
 
 def bipartiteNullModelSimilarity(
@@ -120,6 +180,7 @@ def bipartiteNullModelSimilarity(
         repetitionCount = 2,
         minSimilarity = 0.0,
         idf = None, # None, "none", "log","log1p",
+        IDFWeightsRealizations = 1000,
         returnDegreeSimilarities = False,
         returnDegreeValues = False,
         showProgress=True,
@@ -166,6 +227,10 @@ def bipartiteNullModelSimilarity(
          - "log" for an idf term of log(totalFreq/freq)
          - "smoothlog for an idf term of log((totalFreq)/(freq+1)+1)
         default: None
+    IDFWeightsRealizations: int
+        The number of realizations to use for estimating the idf weights of the
+        null model.
+        defaults to 1000
     returnDegreeSimilarities: bool
         Whether to return the degree similarities
         defaults to False
@@ -256,28 +321,9 @@ def bipartiteNullModelSimilarity(
     rightCount = len(rightIndex2Label)
 
 
-    weights = None
-    if(idf is not None and idf.lower() != "none"):
-        idfLeftCount = leftCount
-        right2IDF = np.zeros(rightCount, dtype=np.float64)
-        rightCounts = np.zeros(rightCount, dtype=np.float64)
-        rightBinCounts = np.bincount(bipartiteIndexedEdges[:, 1])
-        rightCounts[:len(rightBinCounts)] = rightBinCounts
-        if(idf.lower() == "linear"):
-            right2IDF = idfLeftCount / rightCounts# unique
-        elif(idf.lower() == "smoothlinear"):
-            right2IDF = (idfLeftCount + 1) / (rightCounts + 1)
-        elif(idf.lower() == "log"):
-            right2IDF = np.log(idfLeftCount / rightCounts)
-        elif(idf.lower() == "smoothlog"):
-            right2IDF = np.log((idfLeftCount / rightCounts) + 1)
-        else:
-            raise ValueError(f"Invalid idf type: {idf}")
-
-        weights = right2IDF[bipartiteIndexedEdges[:, 1]]
+    weights = calculateIDFWeights(bipartiteIndexedEdges, leftCount, rightCount, idf)
         # print("weights: ",len(weights),"edges: ",len(indexedEdges))
     # print("weights:",weights)
-
     
     similarityDictionary = None
     
@@ -353,10 +399,12 @@ def bipartiteNullModelSimilarity(
     
 
     if(realizations>0):
+        estimatedIDFWeights = estimateIDFWeightsShuffled(bipartiteIndexedEdges, leftCount, rightCount, idf, IDFWeightsRealizations, showProgress=showProgress,workers=workers)
+
         if(workers <= 1):
             degreePair2similarity = _processBatch((realizations,
                         currentTQDM, allowedCombinations, repeatedUniqueLeftDegreesIndices,
-                        shuffledEdges,weights,rightCount,repeatedUniqueLeftDegrees,
+                        shuffledEdges,estimatedIDFWeights,rightCount,repeatedUniqueLeftDegrees,
                         True,None))
         else:
             batchRealizations = realizations//batchSize
@@ -372,7 +420,7 @@ def bipartiteNullModelSimilarity(
                 batchRealizationsList.append(batchRealizationsRemainder)
 
             batchParameters = [(batchRealizations,None,allowedCombinations,repeatedUniqueLeftDegreesIndices,
-                                shuffledEdges,weights,rightCount,repeatedUniqueLeftDegrees,
+                                shuffledEdges,estimatedIDFWeights,rightCount,repeatedUniqueLeftDegrees,
                                 False,childSeed) for batchRealizations,childSeed in zip(batchRealizationsList,childSeeds)]
             
             # print("Shapes of all parameters")
@@ -510,7 +558,7 @@ def bipartiteNullModelSimilarity(
         toDegree = leftDegrees[toIndex]
         # expectedSimilarityCount = realizations 
         # if(fromIndex ==toIndex):
-            
+        
         degreeEdge = (min(fromDegree, toDegree), max(fromDegree, toDegree))
         similarities = degreePair2similarity[degreeEdge]
         if(shouldCalculatePvalues):
