@@ -7,6 +7,7 @@ import coordinationz.experiment_utilities as czexp
 data_name = "cuba_082020_tweets"
 df_type = "io"
 sbert_model = "paraphrase-multilingual-MiniLM-L12-v2"
+column = "text"
 
 config = cz.config
 tqdm.pandas()
@@ -18,7 +19,7 @@ elif df_type == "eval":
 else:
     raise ValueError(f"Invalid dataframe type {df_type}")
 
-content = df["text"].unique()
+content = df[column].unique()
 
 model = SentenceTransformer(sbert_model, device="cuda")
 sentence_embeddings = model.encode(content, show_progress_bar=True)
