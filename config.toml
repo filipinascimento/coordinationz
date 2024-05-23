@@ -1,6 +1,8 @@
 [paths]
 EVALUATION_DATASETS = "/mnt/osome/Challenge2/Data/Preprocessed/"
 IO_DATASETS = "/mnt/osome/INCAS/infoops"
+INCAS_DATASETS = "/mnt/osome/INCAS/phase2b"
+INCAS_PREPROCESSED_DATASETS = "/mnt/osome/INCAS/phase2b"
 NETWORKS = "./Data/Networks"
 FIGURES = "./Data/Figures"
 
