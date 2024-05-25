@@ -158,6 +158,7 @@ Temporary Items
 .snakemake
 .vscode
 /Data
+/Figures
 
 
 #jobs
