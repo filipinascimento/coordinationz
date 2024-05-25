@@ -1,3 +1,0 @@
-[submodule "Networks"]
-	path = Outputs
-	url = git@github.com:sinking8/INCAS_outputs.git
