@@ -32,9 +32,13 @@ def loadEvaluationDataset(dataName, config=config, minActivities=0):
     return df
 
 
-def obtainEvaluationBipartiteEdgesRetweets(df):
+def obtainEvaluationBipartiteEdgesRetweets(df,minActivities=1):
     # keep only tweet_type == "retweet"
     df = df[df["tweet_type"] == "retweet"]
+    if minActivities > 0:
+        userActivityCount = df["screen_name"].value_counts()
+        usersWithMinActivities = set(userActivityCount[userActivityCount >= minActivities].index)
+        df = df[df["screen_name"].isin(usersWithMinActivities)]
     bipartiteEdges = df[["screen_name","linked_tweet"]].values
     return bipartiteEdges
 
@@ -108,7 +112,7 @@ def obtainINCASBipartiteEdgesHashtags(df,removeRetweets=True,minActivities=1):
     mask = users.isin(usersWithMinActivities)
     users = users[mask]
     hashtags = hashtags[mask]
-    
+
     # create edges list users -> hashtags
     edges = [(user,hashtag) for user,hashtagList in zip(users,hashtags) for hashtag in hashtagList]
     return edges
@@ -143,10 +147,44 @@ def loadIODataset(dataName, config=config, flavor="all", minActivities=0):
 
 
 
-def obtainIOBipartiteEdgesRetweets(df):
+def obtainIOBipartiteEdgesRetweets(df,minActivities=1):
     # only retweets
     df = df[df.is_retweet]
+    if minActivities > 0:
+        userActivityCount = df["userid"].value_counts()
+        usersWithMinActivities = set(userActivityCount[userActivityCount >= minActivities].index)
+        df = df[df["userid"].isin(usersWithMinActivities)]
     bipartiteEdges = df[["userid","retweet_tweetid"]].values
     return bipartiteEdges
+
+def obtainIOBipartiteEdgesURLs(df,removeRetweets=True,minActivities=1):
+    # row['userid'] url['expanded_url']
+    if(removeRetweets):
+        df = df[~df.is_retweet]
+    # only keep rows with urls
+    mask = df.urls.apply(lambda x: len(x) > 0 if x==x else False)
+    df = df[mask]
+    if minActivities > 0:
+        userActivityCount = df["userid"].value_counts()
+        usersWithMinActivities = set(userActivityCount[userActivityCount >= minActivities].index)
+        df = df[df["userid"].isin(usersWithMinActivities)]
+    bipartiteEdges = [(row["userid"],url) for _,row in df.iterrows() for url in row["urls"]]
+    return bipartiteEdges
+
+def obtainIOBipartiteEdgesHashtags(df,removeRetweets=True,minActivities=1):
+    # "userid" and "hashtags" (list)
+    if(removeRetweets):
+        df = df[~df.is_retweet]
+    # only keep rows with hashtags
+    mask = df.hashtags.apply(lambda x: len(x) > 0 if x==x else False)
+    df = df[mask]
+    if minActivities > 0:
+        userActivityCount = df["userid"].value_counts()
+        usersWithMinActivities = set(userActivityCount[userActivityCount >= minActivities].index)
+        df = df[df["userid"].isin(usersWithMinActivities)]
+    bipartiteEdges = [(row["userid"],hashtag) for _,row in df.iterrows() for hashtag in row["hashtags"]]
+    return bipartiteEdges
+
+
 
 
