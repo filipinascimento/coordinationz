@@ -113,13 +113,13 @@ if __name__ == "__main__": # Needed for parallel processing
     for networkName in indicators:
         print(f"Creating the {networkName} network...")
         bipartiteEdges = bipartiteMethod[networkName](df)
-        if(not bipartiteEdges):
+        if(len(bipartiteEdges)==0):
             print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
             continue
 
         bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
 
-        if(not bipartiteEdges):
+        if(len(bipartiteEdges)==0):
             print(f"\n-------\nWARNING: No {networkName} edges found after filtering.\n-------\n")
             continue
 
