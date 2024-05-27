@@ -7,6 +7,7 @@ import json
 import os
 from . import config
 from pathlib import Path
+import csv
 
 dropped_columns = [
     "author",
@@ -65,10 +66,13 @@ def loadPreprocessedData(dataName,config=config,**kwargs):
         "text": str,
         # "creation_date": str,
         "linked_tweet": str,
+        "linked_tweet_user_id": str,
         "urls": str,
         "hashtags": str,
         "mentioned_users": str,
+        "category": str,
     }
+
     # if dtype in kwargs, merge with existing dtype
     if("dtype" in kwargs):
         dtype.update(kwargs["dtype"])
@@ -76,7 +80,11 @@ def loadPreprocessedData(dataName,config=config,**kwargs):
 
     preprocessedFilePath = Path(config["paths"]["PREPROCESSED_DATASETS"])/(dataName+".csv")
 
-    df = pd.read_csv(preprocessedFilePath, dtype=dtype, **kwargs)
+    df = pd.read_csv(preprocessedFilePath, dtype=dtype,
+                     escapechar='\\',
+                     encoding='utf-8',
+                     quoting=csv.QUOTE_NONNUMERIC,
+                     **kwargs)
 
     df["hashtags"] = df["hashtags"].apply(ast.literal_eval)
     df["mentioned_users"] = df["mentioned_users"].apply(ast.literal_eval)
@@ -264,9 +272,132 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
             df["urls"] = df["urls"].map(lambda x: x if x == x and x is not None else [])
             
             if(firstTime):
-                df.to_csv(preprocessedFilePath, index=False)
+                df.to_csv(preprocessedFilePath, index=False,escapechar='\\', encoding='utf-8',quoting=csv.QUOTE_NONNUMERIC)
                 firstTime = False
             else:
-                df.to_csv(preprocessedFilePath, mode='a', header=False, index=False)
+                df.to_csv(preprocessedFilePath, mode='a', header=False, index=False,escapechar='\\', encoding='utf-8',quoting=csv.QUOTE_NONNUMERIC)
     progressBar.close()
     
+
+def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","control"],keepAllColumns=False):
+
+    flavors = ["io","control"]
+    
+    print("Reading Data...")
+    datasets = {}
+    for flavor in flavors:
+        print(f"Reading flavor {flavor}...")
+        expectedLocation = dataPath/flavor/f'{dataName}_{flavor}.pkl.gz'
+        if(not expectedLocation.exists()):
+            print(f"File {expectedLocation} does not exist.")
+            expectedLocation = dataPath/flavor/f'{dataName}.pkl.gz'
+        if(not expectedLocation.exists()):
+            print(f"File {expectedLocation} does not exist. Skipping flavor {flavor}.")
+            continue
+        datasets[flavor] = pd.read_pickle(expectedLocation,
+                                          compression='gzip')
+        datasets[flavor]["category"] = flavor
+
+    print(f"Combining datasets...")
+    # concatenate 
+    df = pd.concat(datasets.values(), ignore_index=True)
+    
+
+    print(f"Normalizing attributes...")
+    df = df.add_prefix("data_")
+
+    remapAttributes = {
+        "tweetid": "tweet_id", # string
+        # "screen_name": "user_id", # string
+        "userid": "user_id", # string
+        "tweet_type": "tweet_type", # string
+        "tweet_text": "text", # string
+        "created_at": "created_at", # datetime
+        "linked_tweet": "linked_tweet", #retweet/quote/etc/ #string
+        "linked_tweet_userid": "linked_tweet_user_id", #string
+        "urls": "urls", #list of strings
+        "hashtags": "hashtags", #list of strings
+        "mentions": "mentioned_users", #list of strings
+        "category": "category"
+    }
+
+
+    # merge mentions and user_mentions
+    df["data_mentions"] = df["data_mentions"].combine_first(df["data_user_mentions"])
+    # created_at data format: Fri Jul 31 23:56:25 +0000 2020
+    df["data_created_at"] = pd.to_datetime(df["data_created_at"], format='%a %b %d %H:%M:%S %z %Y')
+    # same for data_tweet_time but that format: 2014-07-17 00:36
+    df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"], format='%Y-%m-%d %H:%M')
+    # merge the data_creation_date and data_tweet_time
+    df["data_created_at"] = df["data_created_at"].combine_first(df["data_tweet_time"])
+
+    # normalize hashtags (string mixed with lists)
+    # use evaluate literal if it is a string
+    # set nan to ""
+    df["data_hashtags"] = df["data_hashtags"].fillna("[]")
+    df["data_hashtags"] = df["data_hashtags"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+
+    df["data_urls"] = df["data_urls"].fillna("[]")
+    df["data_urls"] = df["data_urls"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+
+    df["data_mentions"] = df["data_mentions"].fillna("[]")
+    df["data_mentions"] = df["data_mentions"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+    
+    # replace None in quoted_tweet_tweetid, in_reply_to_tweetid, and retweet_tweetid with NaN
+    df["data_in_reply_to_tweetid"] = df["data_in_reply_to_tweetid"].replace({None: pd.NA})
+    df["data_quoted_tweet_tweetid"] = df["data_quoted_tweet_tweetid"].replace({None: pd.NA})
+    df["data_retweet_tweetid"] = df["data_retweet_tweetid"].replace({None: pd.NA})
+    df["data_in_reply_to_tweetid"] = df["data_in_reply_to_tweetid"].replace({"None": pd.NA})
+    df["data_quoted_tweet_tweetid"] = df["data_quoted_tweet_tweetid"].replace({"None": pd.NA})
+    df["data_retweet_tweetid"] = df["data_retweet_tweetid"].replace({"None": pd.NA})
+
+    # repeat for userid
+    df["data_in_reply_to_userid"] = df["data_in_reply_to_userid"].replace({None: pd.NA})
+    df["data_retweet_userid"] = df["data_retweet_userid"].replace({None: pd.NA})
+    df["data_in_reply_to_userid"] = df["data_in_reply_to_userid"].replace({"None": pd.NA})
+    df["data_retweet_userid"] = df["data_retweet_userid"].replace({"None": pd.NA})
+
+    
+
+    df["data_tweet_type"] = "tweet"
+    # tweet_type = "retweet" when is_retweet 
+    # tweet_type = "quote" when quoted_tweet_tweetid is not NaN
+    # tweet_type = "reply" when in_reply_to_tweetid is not NaN
+    df.loc[df["data_is_retweet"], "data_tweet_type"] = "retweet"
+    df.loc[~df["data_quoted_tweet_tweetid"].isna(), "data_tweet_type"] = "quote"
+    df.loc[~df["data_in_reply_to_tweetid"].isna(), "data_tweet_type"] = "reply"
+
+    # merge in_reply_to_tweetid, quoted_tweet_tweetid and data_retweet_tweetid into linked_tweet
+    
+    df["data_linked_tweet"] = df["data_in_reply_to_tweetid"].combine_first(df["data_quoted_tweet_tweetid"]).combine_first(df["data_retweet_tweetid"])
+    df["data_linked_tweet_user_id"] = df["data_in_reply_to_userid"].combine_first(df["data_retweet_userid"])
+
+    # add suffix data_ to keys
+    remapAttributes = {f"data_{k}": f"{v}" for k, v in remapAttributes.items()}
+    df = df.rename(columns=remapAttributes)
+        # delete redundant columns
+
+    if(keepAllColumns):
+        print(f"Removing redundant columns...")
+        df = df.drop(columns=[
+            "data_in_reply_to_tweetid",
+            "data_quoted_tweet_tweetid",
+            "data_retweet_tweetid",
+            "data_in_reply_to_userid",
+            "data_retweet_userid",
+            "data_tweet_time",
+            "data_is_retweet",
+            "data_tweet_time",
+            "data_user_mentions"
+        ])
+    else:
+        print(f"Removing columns not needed for analysis...")
+        # drop all columns starting with data_
+        df = df.filter(regex='^(?!data_)')
+
+    print(f"Saving to CSV...")
+    df.to_csv(preprocessedFilePath, index=False,
+                escapechar='\\',
+                encoding='utf-8',
+                quoting=csv.QUOTE_NONNUMERIC)
+
