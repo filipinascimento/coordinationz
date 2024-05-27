@@ -44,7 +44,7 @@ if __name__ == "__main__": # Needed for parallel processing
     suffix = args.suffix
 
     if("all" in indicators):
-        indicators = ["coretweet","cohashtag","courl"]
+        indicators = ["coretweet","cohashtag","courl","coretweetusers"]
     
     configPath = args.config
     if(configPath is not None):
