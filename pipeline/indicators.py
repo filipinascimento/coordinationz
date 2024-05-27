@@ -141,6 +141,12 @@ if __name__ == "__main__": # Needed for parallel processing
             # usePValueWeights = True,
             **runParameters["network"][networkName]
         )
+            
+        if("category" in df.columns):
+            # dictionary
+            user2category = dict(df[["user","category"]].drop_duplicates().values)
+            g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
+
         xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
         generatedNetworks[networkName] = g
     
@@ -148,12 +154,6 @@ if __name__ == "__main__": # Needed for parallel processing
     mergingMethod = runParameters["merging"]["method"]
 
     mergedNetwork = czind.mergeNetworks(generatedNetworks)
-    
-    if("category" in df.columns):
-        # dictionary
-        user2category = dict(df[["user","category"]].drop_duplicates().values)
-        mergedNetwork.vs["category"] = [user2category.get(user,"None") for user in mergedNetwork.vs["Label"]]
-
 
     xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged.xnet")
 
