@@ -72,6 +72,23 @@ Such a process will generate files in the output directories defined by `NETWORK
 
 In particular, the `TABLES` folder will contain the suspicious pairs of users and clusters in CSV format.
 
+The `NETWORKS` folder will contain the networks in xnet format. xnet format can be read by using the xnetwork package:
+```bash
+pip install xnetwork
+```
+and using the following code:
+```python
+import xnetwork as xn
+g = xn.load("network.xnet")
+```
+
+The result is an igraph network. You can convert it to the networkx format by using the following code:
+```python
+network = g.to_networkx()
+```
+
+The config file used to generate the data will be copied to the "CONFIG" directory. A new section will be added to the config with extra parameters about the run.
+
 
 ## Run for IO datasets
 Repeat the same steps as for INCAS datasets, but set the `IO_DATASETS` variable in the config.toml file to the location of the IO datasets. Also, for preprocessing, use the `pipeline/preprocess/preprocessIO.py` script.
