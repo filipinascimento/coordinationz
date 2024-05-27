@@ -171,6 +171,7 @@ def parseParameters(config,indicators):
     nullModelOptions = {
         "scoreType": ("scoreType",["zscore","pvalue-quantized"]),
         "realizations":("realizations",10000),
+        "pvaluesQuantized":("pvaluesQuantized",None),
         "idf":("idf","smoothlog"), # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         "minSimilarity":("minSimilarity",0.1),
         "batchSize":("batchSize",10),
