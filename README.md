@@ -50,7 +50,7 @@ First, the files should be preprocessed. This can be done by running the followi
 ```bash
 python pipeline/preprocess/preprocessINCAS.py <dataname>
 ``` 
-where `dataname` is the name of the dataset, which correspondts to the `<INCAS_DATASETS>/<dataname>.jsonl` file.
+where `dataname` is the name of the dataset, which correspondts to the `<INCAS_DATASETS>/<dataname>.jsonl` file. Together with the preprocessed data, the script will generate a .txt file with some information about the dataset.
 
 The parameters of the indicators can be set in the config.toml file.
 
