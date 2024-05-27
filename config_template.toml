@@ -1,0 +1,65 @@
+[paths]
+# Location of the raw datasets
+IO_DATASETS = "/mnt/osome/INCAS/infoops_new" # Location of pkl files
+INCAS_DATASETS = "/mnt/osome/INCAS/datasets" # Location of jsonl files
+
+# Location where the preprocessed datasets will be stored
+PREPROCESSED_DATASETS = "Data/Preprocessed"
+
+#Logation of the outputs 
+NETWORKS = "Outputs/Networks"
+FIGURES = "Outputs/Figures"
+TABLES = "Outputs/Tables"
+CONFIGS = "Outputs/Configs"
+
+
+# General settings for the null model
+[nullmodel]
+realizations = 100_000
+scoreType = ["zscore","pvalue-quantized"] # pvalue-quantized, pvalue, or zscore, 
+pvaluesQuantized = [0.00001,0.00002,0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,0.02,0.05,0.1,0.25,0.5]
+batchSize = 100
+idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
+workers = -1 # Number of parallel workers. If -1, all the available cores will be used
+minSimilarity = 0.3 # will only consider similarities above that
+# Specific settings for nullmodel of indicators
+# will overwrite the general settings
+# Example:
+# [nullmodel.coretweet]
+# minSimilarity = 0.4
+#
+# [nullmodel.cohashtag]
+# idf = "smoothlinear"
+
+# General settings for indicators
+[indicator]
+# total number of different items(left nodes) for that indicator
+# e.g., minimum unique hashtags of the user
+minUserDegree = 10
+# total activity of the user for that indicator
+# e.g., minimum uses of a user
+minUserStrength = 1
+# total number of different users(right nodes) for that indicator
+# e.g., minimum unique users that used a hashtag
+minItemDegree = 1
+# total activity of the item for that indicator
+# e.g., minimum uses of a hashtag
+minItemStrength = 1
+# p-value threshold for the network
+pvalueThreshold = 0.01
+
+# Specific settings for indicators
+# will overwrite the general settings
+# Example:
+# [indicator.coretweet]
+# minUserDegree = 20
+# pvalueThreshold = 0.05
+#
+# [indicator.cohashtag]
+# minItemDegree = 5
+# minItemStrength = 10
+
+["merging"] 
+method = "pvalue" #method used for merging the networks. Only pvalue is available for now
+
+

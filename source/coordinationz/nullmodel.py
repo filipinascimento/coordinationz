@@ -51,6 +51,7 @@ def _processBatch(parameters):
             # For now, if that is the case, it will enable replacement
             # Once that only degrees combinations existing in the data will be used
             # then we can remove the replacement
+            # print(len(shuffledEdges[:,1]))
             if(len(shuffledEdges[:,1])<len(batchReducedShuffledEdges)):
                 choiceIndices = rng.choice(len(shuffledEdges[:,1]), len(batchReducedShuffledEdges), replace=True)
             else:
@@ -180,7 +181,7 @@ def bipartiteNullModelSimilarity(
         repetitionCount = 2,
         minSimilarity = 0.0,
         idf = None, # None, "none", "log","log1p",
-        IDFWeightsRealizations = 1000,
+        IDFWeightsRealizations = 100,
         returnDegreeSimilarities = False,
         returnDegreeValues = False,
         showProgress=True,
