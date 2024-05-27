@@ -2,15 +2,24 @@ from pathlib import Path
 from tqdm.auto import tqdm
 import coordinationz as cz
 import xnetwork as xn
-import coordinationz.experiment_utilities as czexp
+import coordinationz.indicator_utilities as czind
+import coordinationz.preprocess_utilities as czpre
 import numpy as np
+
+"""
+This script checks the null model similarities for a given bipartite graph using
+a simulated dataset.
+It calculates the similarities between pairs of nodes in the graph and compares
+them to the null model similarities. The null model is created by generating random
+realizations of the graph and calculating the similarities for each realization.
+The script prints the indexed edges, their similarities, and optionally the p-values
+and z-scores.
+"""
 
 if __name__ == "__main__": # Needed for parallel processing
     config = cz.config
+    tqdm.pandas()
     # config = cz.load_config("<path to config>")
-
-    networksPath = Path(config["paths"]["NETWORKS"]).resolve()
-    networksPath.mkdir(parents=True, exist_ok=True)
 
     bipartiteEdges =[
         # e.g., user, hashtag or user, coretweet_id,
@@ -23,6 +32,8 @@ if __name__ == "__main__": # Needed for parallel processing
 
         ("userB", "c"),
         ("userB", "d"),
+        ("userB", "e"),
+        ("userB", "f"),
 
         ("userC", "a"),
         ("userC", "b"),
@@ -53,6 +64,33 @@ if __name__ == "__main__": # Needed for parallel processing
         ("userG", "o"),
     ]
 
+
+
+    randomEdgesSize = 100000
+    hashtagsCount = 10000
+    usersCount = 1000
+
+    def uniformProbabilities(size):
+        return np.ones(size)/size
+    
+    def linearProbabilities(size):
+        probabilities = np.arange(size)
+        return probabilities/np.sum(probabilities)
+    
+    def powelawProbabilities(size,exponent=3):
+        probabilities = 1.0/np.arange(1,size+1)**exponent
+        return probabilities/np.sum(probabilities)
+    
+    hashtagProbabilities = linearProbabilities(hashtagsCount)
+    userProbabilities = uniformProbabilities(usersCount)
+
+    randomUsers = np.random.choice(usersCount, size=randomEdgesSize, p=userProbabilities)
+    randomHashtags = np.random.choice(hashtagsCount, size=randomEdgesSize, p=hashtagProbabilities)
+    randomEdges = [(f"simulated{user}", f"hashtag{hashtag}") for user, hashtag in zip(randomUsers, randomHashtags)]    
+
+        
+    bipartiteEdges+=randomEdges
+
     # scoreType = ["zscore","pvalue"]
     scoreType = ["zscore","pvalue-quantized"]
     # pvalue-quantized is faster than pvalue
@@ -62,10 +100,10 @@ if __name__ == "__main__": # Needed for parallel processing
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
         scoreType=scoreType,
-        realizations=10_000, # number of realizations of the null model, use 0 for no null model
-        batchSize=100, # number of realizations to calculate in each process
-        minSimilarity = 0.0, # will first filter out similarities below this value
-        pvaluesQuantized=[0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,0.02,0.05,0.1,0.25,0.5],
+        realizations=1000, # number of realizations of the null model, use 0 for no null model
+        batchSize=10, # number of realizations to calculate in each process
+        minSimilarity = 0.1, # will first filter out similarities below this value
+        pvaluesQuantized=[0.001,0.005,0.01,0.05,0.1,0.25,0.5],
         # for pvalue-quantized, you can define the p-values of interest
         idf="none", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         workers=-1, # -1 to use all available cores, 0 or 1 to use a single core
@@ -93,9 +131,10 @@ if __name__ == "__main__": # Needed for parallel processing
     labels = nullModelOutput["labels"]
 
     # Print the indexed edges and their similarities together with pvalues and zscores
-    for i, (edge, similarity) in enumerate(zip(nullModelIndexedEdges[0:5], nullModelSimilarities[0:5])):
+    for i, (edge, similarity) in enumerate(zip(nullModelIndexedEdges, nullModelSimilarities)):
         labelledEdge = (labels[edge[0]],labels[edge[1]])
-        
+        if(not labelledEdge[0].startswith("user") or not labelledEdge[1].startswith("user")):
+            continue
         printStringList = []
         printStringList.append(f"{labelledEdge[0]}, {labelledEdge[1]} -> {similarity:.3}")
 
@@ -115,18 +154,8 @@ if __name__ == "__main__": # Needed for parallel processing
     print("")
     
 
-
     # You can access the similarities
     degrees2Similarity = nullModelOutput["nullmodelDegreePairsSimilarities"]
     degrees = nullModelOutput["degrees"]
 
     
-    # Create a network from the null model output with a pvalue threshold of 0.05
-    g = cz.network.createNetworkFromNullModelOutput(
-        nullModelOutput,
-        pvalueThreshold=0.25, # only keep edges with pvalue < 0.5
-    )
-
-    # Save the network
-    xn.save(g, networksPath/f"sample_network.xnet")
-

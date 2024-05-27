@@ -5,7 +5,8 @@ import pandas as pd
 
 # ast evaluates strings that are python expressions
 import ast
-
+import numpy as np
+from collections import Counter
 
 
 
@@ -188,3 +189,15 @@ def obtainIOBipartiteEdgesHashtags(df,removeRetweets=True,minActivities=1):
 
 
 
+def filterRightNodes(bipartiteEdges, minDegree=1,minStrength=1,minActivities=1):
+    # filter right nodes with at least minDegree
+    if(minDegree>1):
+        rightDegrees = Counter(bipartiteEdges[:,1])
+        mask = np.array([rightDegrees[rightNode]>=minDegree for _,rightNode in bipartiteEdges])
+        bipartiteEdges = bipartiteEdges[mask]
+    # filter left nodes with at least minActivities
+    if(minActivities>1):
+        leftDegrees = Counter(bipartiteEdges[:,0])
+        mask = np.array([leftDegrees[leftNode]>=minActivities for leftNode,_ in bipartiteEdges])
+        bipartiteEdges = bipartiteEdges[mask]
+    return bipartiteEdges
