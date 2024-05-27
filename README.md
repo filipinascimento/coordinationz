@@ -21,39 +21,57 @@ To debug the C code, use gdb:
 gdb -ex=run -args python <python file>
 ```
 
-## Run for Phase2B dataset
+## Run for INCAS datasets (e.g., phase2a or phase2b)
 First install the package as described above.
-The next step is setting up the config.toml file. Setup the paths for the INCAS
-datasets and networks
-```toml
-INCAS_DATASETS = "/mnt/osome/INCAS/phase2b"
-INCAS_PREPROCESSED_DATASETS = "/mnt/osome/INCAS/phase2b"
-NETWORKS = "./Data/Networks"
+The next step is setting up the config.toml file. You can use config_template.toml as a template.
+
+```bash
+cp config_template.toml config.toml
 ```
+
+Setup the paths for the INCAS datasets and networks
+```toml
+# Location of jsonl files
+INCAS_DATASETS = "/mnt/osome/INCAS/datasets" 
+
+# Location where the preprocessed datasets will be stored
+PREPROCESSED_DATASETS = "Data/Preprocessed"
+
+#Logation of the outputs 
+NETWORKS = "Outputs/Networks"
+FIGURES = "Outputs/Figures"
+TABLES = "Outputs/Tables"
+CONFIGS = "Outputs/Configs"
+```
+
 The `INCAS_DATASETS` folder should contain the uncompressed jsonl files.
 
-The scripts for processing the phase2b results are in `experiments/phase2b/` folder.
-
-The first step is to generate the preprocessed dataset. This can be done by running the following python script:
+First, the files should be preprocessed. This can be done by running the following python script:
 ```bash
-experiments/phase2b/PreprocessPhase2b.py
-```
+python pipeline/preprocess/preprocessINCAS.py <dataname>
+``` 
+where `dataname` is the name of the dataset, which correspondts to the `<INCAS_DATASETS>/<dataname>.jsonl` file.
+
+The parameters of the indicators can be set in the config.toml file.
 
 Currently, only co-hashtag, co-URL and co-retweets are supported.
 
-To run the analysis, you can run each of the Generate scripts in the `experiments/phase2b/`
-folder. For example, to generate the co-hashtag network, run the following command:
+To run the indicators, you can use the `pipeline/indicators.py` script by running the following command:
 ```bash
-python experiments/phase2b/GenerateCoHashtagNetwork.py
+python pipeline/indicators.py <dataname>
 ```
+where `dataname` is the name of the dataset and `indicator` is the indicator to be run.
 
-After generating all the three networks, you can run the following command to generate the merged
-network:
+You an add a suffix to the output files by adding the `--suffix` parameter:
 ```bash
-python experiments/phase2b/MergeINCASpvalue.py
+python pipeline/indicators.py <dataname> --suffix <suffix>
 ```
-This will generate the merged network in the provided results folder.
-In addition to that, an CSV file containing the suspicious users and respective
-cluster memberships will be generated at the provided results folder.
+if no suffix is provided, the a timestamp will be used as suffix.
+
+Such a process will generate files in the output directories defined by `NETWORKS`, `TABLES`, and `CONFIGS`.
+
+In particular, the `TABLES` folder will contain the suspicious pairs of users and clusters in CSV format.
 
 
+## Run for IO datasets
+Repeat the same steps as for INCAS datasets, but set the `IO_DATASETS` variable in the config.toml file to the location of the IO datasets. Also, for preprocessing, use the `pipeline/preprocess/preprocessIO.py` script.
