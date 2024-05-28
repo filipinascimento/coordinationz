@@ -92,8 +92,8 @@ def load_file(io_path, control_path):
         return df
     elif control_path == None:
         df = pd.read_pickle(io_path)
-        df_io = df_io.loc[
-            ~df_io['quoted_tweet_tweetid'].isnull()
+        df = df.loc[
+            ~df['quoted_tweet_tweetid'].isnull()
         ]
         df['label'] = 1
         
