@@ -15,10 +15,13 @@ logger = logging.getLogger()
 data_name = "cuba_082020_tweets"
 df_type = "io"
 column = "tweet_text"
-buckets = 50000
+buckets = 5000
 min_activity = 10
+seed = 9999
 
 if __name__ == "__main__": # Needed for parallel processing
+    rng = np.random.default_rng(seed)
+
     config = cz.config
     tqdm.pandas()
 
@@ -31,11 +34,13 @@ if __name__ == "__main__": # Needed for parallel processing
         df = czexp.loadEvaluationDataset(data_name, config=config, minActivities=1)
     else:
         raise ValueError(f"Invalid dataframe type {df_type}")
-    
+
+    df = df[df["is_retweet"] == False]
+
     # filter for users and their tweets that are above an activity threshold
     df_min_active = df.groupby(["userid"])["tweetid"].nunique().to_frame("count").reset_index()
     df_min_active = df_min_active.loc[df_min_active["count"] >= min_activity]
-    
+
     df = df.loc[df["userid"].isin(df_min_active["userid"])]
 
     with open(f"{data_name}_embedding.npy", "rb") as f:
@@ -49,7 +54,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
     # get a random sample
     idx = np.arange(len(content))
-    np.random.shuffle(idx)
+    rng.shuffle(idx)
     centroids = sentence_embeddings[idx[:buckets]]
 
     # find the nearest centroid for each tweet
@@ -61,11 +66,11 @@ if __name__ == "__main__": # Needed for parallel processing
     table = {tweet: b for tweet, b in zip(content, buckets.squeeze(-1))}
 
     # convert to bipartite network
-    df = df[df["is_retweet"] == False]
     df = df[["user_screen_name", column]]
     df[column] = df[column].map(table)
     bipartite_edges = df.to_numpy()
 
+    del df, df_min_active, content, sentence_embeddings, unique, index, table
     gc.collect()
 
     # creates a null model output from the bipartite graph
