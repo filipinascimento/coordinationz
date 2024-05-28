@@ -144,7 +144,7 @@ if __name__ == "__main__": # Needed for parallel processing
             
         if("category" in df.columns):
             # dictionary
-            user2category = dict(df[["user","category"]].drop_duplicates().values)
+            user2category = dict(df[["user_id","category"]].drop_duplicates().values)
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
         xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
