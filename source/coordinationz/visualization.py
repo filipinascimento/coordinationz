@@ -278,3 +278,86 @@ def scatter_plot(parameters):
               transparent=False)
         
     plt.show()
+    
+    
+    
+def plot_histogram(parameters):
+    '''
+    Plots histogram
+    :param parameters: parameters for the plot
+    '''
+       
+    # parameters =  {
+    #     'data': df,
+    #     'fontsize': 14,
+    #     'columns': [
+    #         {'column': 'count',
+    #          'label': 'Count of Replies',
+    #         }
+    #     ],
+    #     'xlabel': '',
+    #     'ylabel': '',
+    #     'legend_location': '',
+    #     'log_yscale': True,
+    #     'log_xscale': True,
+    #     'bins': 60,
+    #     'save': {
+    #         'path': '',
+    #         'filename': ''
+    #     },
+    #     'title': ''
+    # }
+    
+    
+    num_bins = parameters['bins']
+    column = parameters['columns'][0]['column']
+    df = parameters['data']
+    
+    if 'size' in parameters:
+        size = parameters['size']
+    else:
+        size = (10, 10)
+    
+    if 'fontsize' in parameters:
+        fontsize = parameters['fontsize']
+    else:
+        fontsize = 14
+    
+    if parameters['bins'] == None:
+        num_bins = df[column].nunique()
+        
+    if parameters['log_xscale'] == True:
+        num_bins=np.logspace(start=np.log10(min(df[column])), 
+                             stop=np.log10(max(df[column])),
+                             num=num_bins
+                            )
+    fig, ax = plt.subplots(figsize=size)
+    
+    n = ax.hist(df[column],
+                bins=num_bins, 
+               )
+    ax.set_xlabel(parameters['xlabel'],
+                  fontsize=fontsize
+                 )
+    ax.set_ylabel(parameters['ylabel'],
+                  fontsize=fontsize
+                 )
+    
+    if parameters['log_yscale'] == True:
+        plt.yscale('log')
+    if parameters['log_xscale'] == True:
+        plt.xscale('log')
+        
+    plt.title(parameters['title'],
+              fontsize=fontsize
+             )
+    
+    if 'save' in parameters:
+        plot_path = parameters['save']['path']
+        title = parameters['save']['filename']
+
+        path = os.path.join(plot_path, title)
+        fig.savefig(f'{path}', 
+                  facecolor='white', 
+                  transparent=False)
+    plt.show()
