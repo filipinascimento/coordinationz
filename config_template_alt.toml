@@ -15,13 +15,13 @@ CONFIGS = "Outputs/Configs"
 
 # General settings for the null model
 [nullmodel]
-realizations = 100_000
-scoreType = ["zscore","pvalue-quantized"] # pvalue-quantized, pvalue, or zscore, 
+realizations = 0
+scoreType = ["quantile"] # pvalue-quantized, pvalue, or zscore, 
 pvaluesQuantized = [0.00001,0.00002,0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,0.02,0.05,0.1,0.25,0.5]
-batchSize = 100
+batchSize = 10
 idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
 workers = -1 # Number of parallel workers. If -1, all the available cores will be used
-minSimilarity = 0.3 # will only consider similarities above that
+minSimilarity = 0.2 # will only consider similarities above that
 # Specific settings for nullmodel of indicators
 # will overwrite the general settings
 # Example:
@@ -46,7 +46,8 @@ minItemDegree = 1
 # e.g., minimum uses of a hashtag
 minItemStrength = 1
 # p-value threshold for the network
-pvalueThreshold = 0.01
+# pvalueThreshold = 0.01
+
 
 # Specific settings for indicators
 # will overwrite the general settings
@@ -60,15 +61,15 @@ pvalueThreshold = 0.01
 # minItemStrength = 10
 
 ["merging"] 
-method = "pvalue" #method used for merging the networks. Only pvalue is available for now
+method = "quantile" #method used for merging the networks. Only pvalue is available for now
 shouldAggregate = true
-weightAttribute = "1-pvalue"
+weightAttribute = "quantile"
 quantileThreshold = 0.0
 pvalueThreshold = 1.0
 zscoreThreshold = 0.0
 similarityThreshold = 0.0
 
 ["output"]
-thresholdAttribute = "1-pvalue"
+thresholdAttribute = "quantile"
 thresholds = [0.95,0.99,0.999,0.9999]
 

@@ -183,7 +183,9 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
 
             df = df.drop(columns=dropped_columns)
             df = df.drop(columns=unnecessary_so_drop)
-
+            if("text" in df.columns):
+                df = df.dropna(subset=["text"])
+                
             # get twitter only
             df = df[df['mediaType'] == 'Twitter']
             if(len(df) == 0):
