@@ -14,7 +14,8 @@ def filter_user(df, min_activity=10):
               .reset_index()
              )
     
-    df_grp = df_grp.loc[df_grp['count'] >= min_activity]
+    df_grp = df_grp.loc[df_grp['count'] >= min_
+                        activity]
     
     df = df.loc[df['userid'].isin(df_grp['userid'])]
     
@@ -233,10 +234,73 @@ def save_edge_attributes(gml_graph, filename):
     :return None
     '''
     all_data = []
-    for u, v, attrs in G.edges(data=True):
+    for u, v, attrs in gml_graph.edges(data=True):
         all_data.append([attrs['weight'], attrs['pvalue'], attrs['zscore']])
 
     (pd.DataFrame(data=all_data,
                   columns=['weight', 'pvalue', 'zscore']
                  )
     ).to_pickle(filename)
+    
+    
+    
+def save_all_graph_attr(gml_graph, filename):
+    '''
+    Save all attributes with graph node label
+    :param gml_graph: GML graph
+    :param filename: Name of file to be saved
+    '''
+    
+    all_data = []
+    for u, v, attrs in gml_graph.edges(data=True):
+        all_data.append([u, v, 
+                         attrs['weight'], 
+                         attrs['pvalue'], 
+                         attrs['zscore']]
+                       )
+
+    df_edge = pd.DataFrame(data=all_data,
+                           columns=['source_index', 'target_index',
+                                    'weight', 'pvalue',
+                                    'zscore'
+                                   ]
+                          )
+
+    nodes = []
+    for node in gml_graph.nodes(data=True):
+        data = [node[0], node[1]['Label']]
+        
+        if 'category' in node[1]:
+            data.append(node[1]['category'])
+            
+        nodes.append(data)
+
+    columns = ['index', 'node_label']
+    if 'category' in node[1]:
+        columns.append('category')
+        
+    df_node = pd.DataFrame(data=nodes,
+                           columns=columns
+                          )
+
+    df_edge = df_edge.merge(df_node,
+                            left_on='source_index',
+                            right_on='index'
+                           )
+    df_edge = df_edge.merge(df_node,
+                            left_on='target_index',
+                            right_on='index'
+                           )
+    df_need = df_edge[['weight', 'pvalue', 'zscore', 
+                       'node_label_x', 
+                       'node_label_y',
+                       'category_x', 'category_y'
+                      ]]
+    df_need = df_need.rename(columns={
+        'node_label_x': 'source',
+        'node_label_y': 'target',
+        'category_x': 'source_label',
+        'category_y': 'target_label'
+    })
+    
+    df_need.to_pickle(filename)

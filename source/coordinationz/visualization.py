@@ -361,3 +361,126 @@ def plot_histogram(parameters):
                   facecolor='white', 
                   transparent=False)
     plt.show()
+    
+    
+def line_plot(parameters):
+    '''
+    Plots ccdf for data
+    
+    :param parameters: parameters to set for the plot
+    '''
+    
+    # {
+    #     'data': df,
+    #     'fontsize': 14,
+    #     'complementary': True,
+    #     'columns': [
+    #         {'column': ''
+    #          'label': '',
+    #         },{
+    #         'column': '',
+    #          'label': ''
+    #         }
+    #     ],
+        # 'x': '',
+    #     'xlabel': '',
+    #     'ylabel': '',
+    #     'legend_location': '',
+    #     'log_yscale': True,
+    #     'log_xscale': True,
+    #     'save': {
+    #         'path': '',
+    #         'filename': ''
+    #     },
+        # 'random_color': False
+    # }
+    
+    keys = parameters.keys()
+    
+    if 'size' in keys:
+        size = parameters['size']
+    else:
+        size = (8,8)
+        
+    fig, ax = plt.subplots(figsize=size)
+    
+    fontsize = parameters['fontsize']
+    colors = ['red', 'blue', 'black', 'orange', 'olive', 'pink', 'lime', 'maroon']
+    total_columns = len(parameters['columns'])
+    
+    if parameters['random_color'] == True:
+        all_colors =  [k for k,v in pltc.cnames.items()]
+        colors = sample(all_colors, total_columns)
+    
+    symbols = ['x', 'o', '+', '*', '.', 'v', '^', '>']
+    
+    i = 0
+    cmap = plt.cm.get_cmap('hsv', total_columns)
+    x = parameters['data'][parameters['x']]
+    for i, column in enumerate(parameters['columns']):
+        data = parameters['data'][column['column']]
+        label = column['label']
+            
+        ax.plot(x,
+                data, 
+                     # complementary=parameters['complementary'],
+                 label=label,
+                 marker=symbols[i],
+                 color=colors[i],
+                 # ax=ax,
+                 linewidth=2,
+                markersize=14
+               )
+
+    if 'x_ticks' in keys:
+        labels = parameters['data'][parameters['x_ticks']].tolist()
+        plt.xticks(x)
+        
+        ax.set_xticklabels(labels, fontsize=fontsize + 2)
+    
+    ax.set_xlabel(parameters['xlabel'], 
+                  fontsize=fontsize + 2)
+    ax.set_ylabel(parameters['ylabel'], 
+                  fontsize=fontsize + 2)
+
+    ax.tick_params(axis='both', labelsize=fontsize) 
+    
+    if 'legend_location' in keys:
+        legend_size = parameters['legend_size']
+        ax.legend(loc=parameters['legend_location'], 
+                  frameon=True, fontsize=legend_size)
+        
+    if 'legend_lower' in keys:
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                         box.width, box.height * 0.9])
+
+        # Put a legend below current axis
+        ax.legend(loc='upper center', 
+                  bbox_to_anchor=(1, -0.06),
+                  fancybox=True, 
+                  shadow=True, ncol=3)
+    
+    if 'log_yscale' in keys and parameters['log_yscale'] == True:
+        ax.set_yscale('log')
+    if 'log_xscale' in keys and parameters['log_xscale'] == True:
+        ax.set_xscale('log')
+    
+    ax.set_aspect('auto')
+
+    if 'title' in keys:
+        plt.title(parameters['title'])
+        
+    fig.tight_layout()
+
+    if 'save' in keys:
+        path = parameters['save']['path']
+        filename = parameters['save']['filename']
+        print(f'{path}/{filename}')
+        fig_path = os.path.join(path, filename)
+        print(fig_path)
+        fig.savefig(fig_path, 
+              facecolor='white', 
+              transparent=False)
+        
+    plt.show()
