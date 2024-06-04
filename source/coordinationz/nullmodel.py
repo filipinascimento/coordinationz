@@ -8,7 +8,7 @@ import multiprocessing as mp
 from multiprocessing import Pool
 from . import fastcosine
 from numpy.random import SeedSequence, default_rng
-
+from scipy.stats import rankdata
 
 # fastcosine
 
@@ -522,7 +522,8 @@ def bipartiteNullModelSimilarity(
             # will calculate the quantiles, i.e., how many similarities are above each similarity value
             # (for each pair in resultSimilarities)
             pairsCount = leftCount*(leftCount-1)//2
-            returnValues["quantiles"] = (pairsCount - np.argsort(resultSimilarities))/pairsCount
+            rank = rankdata(resultSimilarities, method="max")
+            returnValues["quantiles"] = (pairsCount-len(rank)+rank)/pairsCount
 
             # print(f"LeftCount: {pairsCount} len(resultSimilarities): {len(resultSimilarities)}")
         if(returnDegreeValues):
@@ -616,7 +617,8 @@ def bipartiteNullModelSimilarity(
         # will calculate the quantiles, i.e., how many similarities are above each similarity value
         # (for each pair in resultSimilarities)
         pairsCount = leftCount*(leftCount-1)//2
-        returnValues["quantiles"] = (pairsCount - np.argsort(resultSimilarities))/pairsCount
+        rank = rankdata(resultSimilarities, method="max")
+        returnValues["quantiles"] = (pairsCount-len(rank)+rank)/pairsCount
 
     if(shouldCalculatePvalues or shouldCalculatePvaluesQuantized):
         returnValues["pvalues"] = resultPValues

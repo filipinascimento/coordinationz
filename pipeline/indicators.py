@@ -142,7 +142,16 @@ if __name__ == "__main__": # Needed for parallel processing
             **runParameters["nullmodel"][networkName]
         )
         # print(runParameters["nullmodel"][networkName])
-
+        import matplotlib as plt
+        import matplotlib.pyplot as plt
+        similarities = nullModelOutput["similarities"]
+        plt.figure()
+        plt.scatter(similarities, nullModelOutput["quantiles"])
+        plt.xlabel("Similarity")
+        plt.ylabel("Quantile")
+        plt.title("Similarity vs Quantile")
+        plt.savefig("Outputs/Figures/similarity_vs_quantile.png")
+        plt.close()
 
         # Create a network from the null model output with a pvalue threshold of 0.05
         g = cznet.createNetworkFromNullModelOutput(
