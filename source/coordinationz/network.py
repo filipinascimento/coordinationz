@@ -9,8 +9,10 @@ def createNetworkFromNullModelOutput(nullModelOutput,
                                      similarityThreshold = 0.0,
                                      zscoreThreshold = 0.0,
                                      pvalueThreshold = 1.0,
+                                     quantileThreshold = 0.0,
                                      useZscoreWeights = False,
                                      usePValueWeights = False,
+                                     useQuantileWeights = False,
                                      showProgress = True):
     """
     Creates a network from the null model output
@@ -68,12 +70,17 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         edgeAttributes["weight"] = 1.0-np.array(nullModelOutput["pvalues"])
         edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["weight"], nan=1.0, posinf=1.0, neginf=1.0)
 
+    if("quantiles" in nullModelOutput and useQuantileWeights):
+        edgeAttributes["weight"] = np.array(nullModelOutput["quantiles"])
+        edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["quantiles"], nan=0.0, posinf=1.0, neginf=0.0)
+
 
     if("zscores" in nullModelOutput):
         edgeAttributes["zscore"] = np.array(nullModelOutput["zscores"])
     if("pvalues" in nullModelOutput):
         edgeAttributes["pvalue"] = np.array(nullModelOutput["pvalues"])
-    
+    if("quantiles" in nullModelOutput):
+        edgeAttributes["quantile"] = np.array(nullModelOutput["quantiles"])
     if("degrees" in nullModelOutput):
         vertexAttributes["left_degree"] = np.array(nullModelOutput["degrees"])
 
@@ -93,6 +100,8 @@ def createNetworkFromNullModelOutput(nullModelOutput,
                 edgesMask *= edgeAttributes["pvalue"] <= pvalueThreshold
             else:
                 edgesMask *= edgeAttributes["pvalue"] < pvalueThreshold
+        if(quantileThreshold > 0.0 and "quantiles" in nullModelOutput):
+            edgesMask *= edgeAttributes["quantile"] > quantileThreshold
 
         edges = edges[edgesMask, :]
         edgeAttributes["weight"] = edgeAttributes["weight"][edgesMask]
@@ -100,6 +109,8 @@ def createNetworkFromNullModelOutput(nullModelOutput,
             edgeAttributes["zscore"] = edgeAttributes["zscore"][edgesMask]
         if("pvalues" in nullModelOutput):
             edgeAttributes["pvalue"] = edgeAttributes["pvalue"][edgesMask]
+        if("quantiles" in nullModelOutput):
+            edgeAttributes["quantile"] = edgeAttributes["quantile"][edgesMask]
 
     if(showProgress):
         progressbar.update(1)

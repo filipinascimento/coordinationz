@@ -183,7 +183,9 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
 
             df = df.drop(columns=dropped_columns)
             df = df.drop(columns=unnecessary_so_drop)
-
+            if("text" in df.columns):
+                df = df.dropna(subset=["text"])
+                
             # get twitter only
             df = df[df['mediaType'] == 'Twitter']
             if(len(df) == 0):
@@ -263,7 +265,7 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
             df = df.rename(columns=remapAttributes)
             
             # calculate 
-            hashtags = df["text"].str.findall(r"#\w+")
+            hashtags = df["text"].str.lower().str.findall(r"#\w+")
             df["hashtags"] = hashtags
             # replace nan with empty list
             df["hashtags"] = df["hashtags"].map(lambda x: x if x == x and x is not None else [])

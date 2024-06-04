@@ -13,6 +13,7 @@ import coordinationz.network as cznet
 import sys
 import argparse
 import shutil
+import json
 
 
 
@@ -50,8 +51,14 @@ if __name__ == "__main__": # Needed for parallel processing
     configPath = args.config
     if(configPath is not None):
         config = cz.load_config(configPath)
+        # print("------")
+        print("Loading config from",configPath,"...")
+        # print("------")
     else:
         config = cz.config
+        # print("------")
+        print("Loading config from default location...")
+        # print("------")
 
     if(dataName.endswith(".csv")):
         # get base file name
@@ -97,8 +104,6 @@ if __name__ == "__main__": # Needed for parallel processing
         "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers
     }
 
-    config = cz.reload_config()
-
     runParameters = czind.parseParameters(config,indicators)
 
     print("Loading data...")
@@ -110,6 +115,7 @@ if __name__ == "__main__": # Needed for parallel processing
     if(not suffix): 
         suffix = czind.timestamp()
 
+    allUsers = set()
     generatedNetworks = {}
     for networkName in indicators:
         print(f"Creating the {networkName} network...")
@@ -119,11 +125,14 @@ if __name__ == "__main__": # Needed for parallel processing
             continue
 
         bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
+        # (user_ids, items)
+        allUsers.update(set([userid for userid,_ in bipartiteEdges]))
 
         if(len(bipartiteEdges)==0):
             print(f"\n-------\nWARNING: No {networkName} edges found after filtering.\n-------\n")
             continue
-
+        
+        
         # bipartiteEdges.to_csv(networksPath/f"{dataName}_{networkName}_bipartiteEdges.csv", index=False)
         # creates a null model output from the bipartite graph
         nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
@@ -132,7 +141,17 @@ if __name__ == "__main__": # Needed for parallel processing
             returnDegreeValues=True, # will return the degrees of the nodes
             **runParameters["nullmodel"][networkName]
         )
-
+        # print(runParameters["nullmodel"][networkName])
+        import matplotlib as plt
+        import matplotlib.pyplot as plt
+        similarities = nullModelOutput["similarities"]
+        plt.figure()
+        plt.scatter(similarities, nullModelOutput["quantiles"])
+        plt.xlabel("Similarity")
+        plt.ylabel("Quantile")
+        plt.title("Similarity vs Quantile")
+        plt.savefig("Outputs/Figures/similarity_vs_quantile.png")
+        plt.close()
 
         # Create a network from the null model output with a pvalue threshold of 0.05
         g = cznet.createNetworkFromNullModelOutput(
@@ -144,7 +163,7 @@ if __name__ == "__main__": # Needed for parallel processing
             
         if("category" in df.columns):
             # dictionary
-            user2category = dict(df[["user","category"]].drop_duplicates().values)
+            user2category = dict(df[["user_id","category"]].drop_duplicates().values)
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
         xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
@@ -152,19 +171,26 @@ if __name__ == "__main__": # Needed for parallel processing
     
     print(f"Merging networks...")
     mergingMethod = runParameters["merging"]["method"]
-
-    mergedNetwork = czind.mergeNetworks(generatedNetworks)
+    del runParameters["merging"]["method"]
+    mergedNetwork = czind.mergeNetworks(generatedNetworks,
+                                        **runParameters["merging"])
 
     xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged.xnet")
 
 
     print(f"Saving data...")
-    suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
-    suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)
-
-    suspiciousEdgesData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges.csv",index=False)
-    suspiciousClustersData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_clusters.csv")
-
+    incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
+                                                 **runParameters["output"])
+    
+    # suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
+    # suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)
+    # suspiciousEdgesData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges.csv",index=False)
+    # suspiciousClustersData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_clusters.csv")
+    # save incasOutput to a json file
+    for threshold,outputData in incasOutput.items():
+        with open(tablesPath/f"{dataName}_{suffix}_segments_{threshold}.json", "w") as f:
+            json.dump(outputData, f)
+    
     config["run"]= {
         "dataName":dataName,
         "suffix":suffix,
