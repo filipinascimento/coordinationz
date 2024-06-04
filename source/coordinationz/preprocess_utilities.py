@@ -265,7 +265,7 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
             df = df.rename(columns=remapAttributes)
             
             # calculate 
-            hashtags = df["text"].str.findall(r"#\w+")
+            hashtags = df["text"].str.lower().str.findall(r"#\w+")
             df["hashtags"] = hashtags
             # replace nan with empty list
             df["hashtags"] = df["hashtags"].map(lambda x: x if x == x and x is not None else [])
