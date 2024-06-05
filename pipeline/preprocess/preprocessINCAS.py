@@ -66,7 +66,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
     czpre.preprocessINCASData(inputFilePath, preprocessedFilePath)
 
-    df = czpre.loadPreprocessedData(dataName)
+    df = czpre.loadPreprocessedData(dataName, config=config)
 
     report = czpre.generateReport(df)
 
