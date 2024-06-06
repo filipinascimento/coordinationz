@@ -46,7 +46,7 @@ if __name__ == "__main__": # Needed for parallel processing
     suffix = args.suffix
 
     if("all" in indicators):
-        indicators = ["coretweet","cohashtag","courl","coretweetusers"]
+        indicators = ["coretweet","cohashtag","courl","coretweetusers","textsimilarity"]
     
     configPath = args.config
     if(configPath is not None):
@@ -96,12 +96,16 @@ if __name__ == "__main__": # Needed for parallel processing
     tablesPath = Path(config["paths"]["TABLES"]).resolve()
     tablesPath.mkdir(parents=True, exist_ok=True)
 
+    def text_similarity_partial(df):
+        return czind.obtainBipartiteEdgesTextSimilarity(df, dataName, **config["indicator"]["textsimilarity"])
+
     # Available indicators
     bipartiteMethod = {
         "coretweet": czind.obtainBipartiteEdgesRetweets,
         "cohashtag": czind.obtainBipartiteEdgesHashtags,
         "courl": czind.obtainBipartiteEdgesURLs,
-        "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers
+        "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
+        "textsimilarity": text_similarity_partial
     }
 
     runParameters = czind.parseParameters(config,indicators)
