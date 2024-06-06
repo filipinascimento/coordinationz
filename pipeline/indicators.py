@@ -46,11 +46,7 @@ if __name__ == "__main__": # Needed for parallel processing
     suffix = args.suffix
 
     if("all" in indicators):
-<<<<<<< HEAD
         indicators = ["coretweet","cohashtag","courl","coretweetusers","coword"]
-=======
-        indicators = ["coretweet","cohashtag","courl","coretweetusers","textsimilarity"]
->>>>>>> 2e20fe2 (First working version of text similarity)
     
     configPath = args.config
     if(configPath is not None):
@@ -96,6 +92,8 @@ if __name__ == "__main__": # Needed for parallel processing
     configsPath = Path(config["paths"]["CONFIGS"]).resolve()
     configsPath.mkdir(parents=True, exist_ok=True)
 
+    figuresPath = Path(config["paths"]["FIGURES"]).resolve()
+    figuresPath.mkdir(parents=True, exist_ok=True)
 
     tablesPath = Path(config["paths"]["TABLES"]).resolve()
     tablesPath.mkdir(parents=True, exist_ok=True)
@@ -109,11 +107,7 @@ if __name__ == "__main__": # Needed for parallel processing
         "cohashtag": czind.obtainBipartiteEdgesHashtags,
         "courl": czind.obtainBipartiteEdgesURLs,
         "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
-<<<<<<< HEAD
         "coword": czind.obtainBipartiteEdgesWords
-=======
-        "textsimilarity": text_similarity_partial
->>>>>>> 2e20fe2 (First working version of text similarity)
     }
 
     runParameters = czind.parseParameters(config,indicators)
