@@ -36,9 +36,9 @@ def filter_active(df, embed_keys, sentence_embeddings, min_activity=10, column="
 
     # filter for users and their tweets that are above an activity threshold
     df_min_active = df.groupby(["user_id"])["tweet_id"].nunique().to_frame("count").reset_index()
-    df_min_active = df_min_active.loc[df_min_active["count"] >= min_activity]
+    df_min_active = df_min_active[df_min_active["count"] >= min_activity]
 
-    df = df.loc[df["user_id"].isin(df_min_active["user_id"])]
+    df = df[df["user_id"].isin(df_min_active["user_id"])]
 
     # filter for tweets from active users
     unique = set(df[column])
@@ -64,7 +64,7 @@ def get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=5000, column="t
     table = {tweet: b for tweet, b in zip(embed_keys, buckets.squeeze(-1))}
 
     # convert to bipartite network
-    df = df[["user_id", column]]
+    df = df[["user_id", column]].copy()
     df[column] = df[column].map(table)
     bipartite_edges = df.to_numpy()
 
