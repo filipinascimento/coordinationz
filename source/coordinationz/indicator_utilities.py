@@ -39,7 +39,6 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
         df = df[df["user_id"].isin(usersWithMinActivities)]
     return df
 
-
 def obtainBipartiteEdgesRetweets(df):
     # keep only tweet_type == "retweet"
     # if linked_tweet or tweet_type or user_id are not in the dataframe, return an empty list
@@ -102,8 +101,13 @@ def obtainBipartiteEdgesHashtags(df,removeRetweets=True,removeQuotes=False,remov
     edges = [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     return edges
 
+def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999):
+    embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
+    embed_keys, sentence_embeddings = ts.filter_active(df, embed_keys, sentence_embeddings, min_activity=min_activity, column=column)
 
+    bipartite_edges = ts.get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=n_buckets, seed=seed)
 
+<<<<<<< HEAD
 try:
     nlp = spacy.load('en_core_web_lg')
 except OSError:
@@ -192,6 +196,9 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
     edges = [(user,token) for user,token_list in zip(users,tokens) for token in token_list]
     return edges
 
+=======
+    return bipartite_edges
+>>>>>>> 2e20fe2 (First working version of text similarity)
 
 def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
     # goes from right to left

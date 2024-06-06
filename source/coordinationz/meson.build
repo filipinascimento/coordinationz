@@ -10,7 +10,11 @@ py_sources = files(
     'indicator_utilities.py',
     'cohashtag_helper.py',
     'visualization.py',
+<<<<<<< HEAD
     'usc_text_similarity.py',
+=======
+    'textsimilarity_helper.py',
+>>>>>>> 2e20fe2 (First working version of text similarity)
 )
 
 

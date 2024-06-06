@@ -1,0 +1,71 @@
+from sentence_transformers import SentenceTransformer
+from pathlib import Path
+import numpy as np
+from pynndescent import NNDescent
+
+def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None):
+    if cache_path is not None: 
+        cache_path = Path(cache_path).resolve()
+        cache_path.mkdir(parents=True, exist_ok=True)
+
+        cache_path = cache_path / f"{data_name}_{model}_{column}.npz"
+        
+        if cache_path.is_file():
+            print("Loading sentence embeddings from cache...")
+            cache = np.load(cache_path)
+
+            embed_keys = cache["keys"].tolist()
+            sentence_embeddings = cache["embeddings"]
+
+            return embed_keys, sentence_embeddings
+
+    tweets = df[column].unique()
+
+    model = SentenceTransformer(model, device="cuda")
+    sentence_embeddings = model.encode(tweets, show_progress_bar=True)
+
+    embed_keys = tweets.tolist()
+    
+    if cache_path is not None:
+        np.savez_compressed(cache_path, keys=embed_keys, embeddings=sentence_embeddings)
+
+    return embed_keys, sentence_embeddings
+
+def filter_active(df, embed_keys, sentence_embeddings, min_activity=10, column="text"):
+    df = df[df["tweet_type"] != "retweet"]
+
+    # filter for users and their tweets that are above an activity threshold
+    df_min_active = df.groupby(["user_id"])["tweet_id"].nunique().to_frame("count").reset_index()
+    df_min_active = df_min_active.loc[df_min_active["count"] >= min_activity]
+
+    df = df.loc[df["user_id"].isin(df_min_active["user_id"])]
+
+    # filter for tweets from active users
+    unique = set(df[column])
+    mask = [tweet in unique for tweet in embed_keys]
+    embed_keys = [tweet for tweet, val in zip(embed_keys, mask) if val]
+    sentence_embeddings = sentence_embeddings[mask]
+
+    return embed_keys, sentence_embeddings
+
+def get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=5000, column="text", seed=9999):
+    # get a random sample
+    idx = np.arange(len(embed_keys))
+    rng = np.random.default_rng(seed)
+    rng.shuffle(idx)
+    centroids = sentence_embeddings[idx[:n_buckets]]
+
+    # find the nearest centroid for each tweet
+    index = NNDescent(centroids, n_neighbors=100, low_memory=False, diversify_prob=0.0, random_state=seed)
+    index.prepare()
+
+    buckets, _ = index.query(sentence_embeddings, k=1, epsilon=0.3)
+
+    table = {tweet: b for tweet, b in zip(embed_keys, buckets.squeeze(-1))}
+
+    # convert to bipartite network
+    df = df[["user_id", column]]
+    df[column] = df[column].map(table)
+    bipartite_edges = df.to_numpy()
+
+    return bipartite_edges
