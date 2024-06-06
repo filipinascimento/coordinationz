@@ -92,6 +92,8 @@ if __name__ == "__main__": # Needed for parallel processing
     configsPath = Path(config["paths"]["CONFIGS"]).resolve()
     configsPath.mkdir(parents=True, exist_ok=True)
 
+    figuresPath = Path(config["paths"]["FIGURES"]).resolve()
+    figuresPath.mkdir(parents=True, exist_ok=True)
 
     tablesPath = Path(config["paths"]["TABLES"]).resolve()
     tablesPath.mkdir(parents=True, exist_ok=True)
@@ -154,7 +156,7 @@ if __name__ == "__main__": # Needed for parallel processing
         plt.xlabel("Similarity")
         plt.ylabel("Quantile")
         plt.title("Similarity vs Quantile")
-        plt.savefig("Outputs/Figures/similarity_vs_quantile.png")
+        plt.savefig(figuresPath / f"{dataName}_{suffix}_{networkName}_similarity_vs_quantile.png")
         plt.close()
 
         # Create a network from the null model output with a pvalue threshold of 0.05
