@@ -16,9 +16,9 @@ import shutil
 import json
 from collections import Counter
 
-dataName = "sampled_20240226"
-networkType = "coretweet"
-suffix = "coretweet"
+dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
+networkType = "cohashtag"
+suffix = "all"
 
 configPath = None
 
@@ -36,7 +36,7 @@ else:
 networksPath = Path(config["paths"]["NETWORKS"]).resolve()
 networkPath = networksPath/f"{dataName}_{suffix}_{networkType}.xnet"
 
-# df = czpre.loadPreprocessedData(dataName, config=config)
+df = czpre.loadPreprocessedData(dataName, config=config)
 
 g = xn.load(networkPath)
 
@@ -50,14 +50,14 @@ elif("weight" in g.es.attributes()):
     similarities = np.array(g.es["weight"])
 
 # plot similarity vs score
-import matplotlib.pyplot as plt
-plt.figure()
-plt.scatter(similarities, scores)
-plt.xlabel("Similarity")
-plt.ylabel("Quantile")
-plt.title("Similarity vs Quantile")
-plt.savefig(f"Outputs/Figures/sim_quantile_{dataName}_{suffix}_{networkType}.png")
-plt.close()
+# import matplotlib.pyplot as plt
+# plt.figure()
+# plt.scatter(similarities, scores)
+# plt.xlabel("Similarity")
+# plt.ylabel("Quantile")
+# plt.title("Similarity vs Quantile")
+# plt.savefig(f"Outputs/Figures/sim_quantile_{dataName}_{suffix}_{networkType}.png")
+# plt.close()
 
 
 # get top 20 edges by quantile
@@ -65,37 +65,37 @@ plt.close()
 quantiles = np.array(g.es["quantile"])
 # plot similarity distribution cummulative
 
-quantileMarkers = [0.99,0.95,0.90]
-plt.figure()
-plt.hist(similarities, bins=100, cumulative=True, density=True)
-# create vertical bars for quantiles markers
-for marker in quantileMarkers:
-    # use quantile variable first point above or equal quantile
-    quantilePosition = similarities[np.argmax(quantiles >= marker)]
-    # quantilePosition = np.quantile(similarities, marker)
-    plt.axvline(quantilePosition,color="red", linestyle="--")
-    # also add text
-    # number of links
-    remainingLinks = np.sum(similarities >= quantilePosition)
-    print(f"Number of links above {marker}: {remainingLinks}")
-    # number of remaining nodes in the network
-    gthreshold = g.copy()
-    if("similarity" in g.es.attributes()):
-        gthreshold.delete_edges(gthreshold.es.select(similarity_lt=quantilePosition))
-    elif("weight" in g.es.attributes()):
-        gthreshold.delete_edges(gthreshold.es.select(weight_lt=quantilePosition))
-    # remove singletons
-    gthreshold.delete_vertices(gthreshold.vs.select(_degree=0))
-    remainingNodes = len(gthreshold.vs)
-    print(f"Number of nodes in the network above {marker}: {remainingNodes}")
-    plt.text(quantilePosition, 0.5, f"{marker} ({remainingLinks}, {remainingNodes})", rotation=90)
+# quantileMarkers = [0.99,0.95,0.90]
+# plt.figure()
+# plt.hist(similarities, bins=100, cumulative=True, density=True)
+# # create vertical bars for quantiles markers
+# for marker in quantileMarkers:
+#     # use quantile variable first point above or equal quantile
+#     quantilePosition = similarities[np.argmax(quantiles >= marker)]
+#     # quantilePosition = np.quantile(similarities, marker)
+#     plt.axvline(quantilePosition,color="red", linestyle="--")
+#     # also add text
+#     # number of links
+#     remainingLinks = np.sum(similarities >= quantilePosition)
+#     print(f"Number of links above {marker}: {remainingLinks}")
+#     # number of remaining nodes in the network
+#     gthreshold = g.copy()
+#     if("similarity" in g.es.attributes()):
+#         gthreshold.delete_edges(gthreshold.es.select(similarity_lt=quantilePosition))
+#     elif("weight" in g.es.attributes()):
+#         gthreshold.delete_edges(gthreshold.es.select(weight_lt=quantilePosition))
+#     # remove singletons
+#     gthreshold.delete_vertices(gthreshold.vs.select(_degree=0))
+#     remainingNodes = len(gthreshold.vs)
+#     print(f"Number of nodes in the network above {marker}: {remainingNodes}")
+#     plt.text(quantilePosition, 0.5, f"{marker} ({remainingLinks}, {remainingNodes})", rotation=90)
 
-plt.xlabel("Similarity")
-plt.ylabel("Density")
-plt.title("Similarity Distribution")
+# plt.xlabel("Similarity")
+# plt.ylabel("Density")
+# plt.title("Similarity Distribution")
 
-plt.savefig(f"Outputs/Figures/sim_distribution_{dataName}_{suffix}_{networkType}.png")
-plt.close()
+# plt.savefig(f"Outputs/Figures/sim_distribution_{dataName}_{suffix}_{networkType}.png")
+# plt.close()
 
 
 topEdgeIndices = np.argsort(scores)[-200:]
@@ -204,64 +204,64 @@ def printEdge(edge):
 printEdge(topEdges[1])
 
 
-# # create dictionary of user (user_id) to all retweets as list (linked_tweet) 
-# user2retweetSets = {}
-# allUsers = set(labels)
-# # onlyEntries in set
-# dfInNetwork = df[df["user_id"].isin(allUsers)].dropna(subset=["linked_tweet"])
-
-# for user,linkedTweet in tqdm(dfInNetwork[["user_id","linked_tweet"]].values):
-#     if user in user2retweetSets:
-#         user2retweetSets[user].add(linkedTweet)
-#     else:
-#         user2retweetSets[user] = set([linkedTweet])
-
-# overlaps = []
-# for edgeIndex, edge in enumerate(tqdm(allEdges)):
-#     user1 = labels[edge[0]]
-#     user2 = labels[edge[1]]
-#     quantile = quantiles[edgeIndex]
-#     if quantile > 0.99999:
-#         if user1 in user2retweetSets and user2 in user2retweetSets:
-#             overlap = len(user2retweetSets[user1].intersection(user2retweetSets[user2]))
-#             overlaps.append(overlap)
-
-# print("\n".join([f"{overlaps}:{overlapCount}" for overlaps,overlapCount in sorted(Counter(overlaps).items())]))
-# # printEdge(topEdges[100])
-
-
-
 # create dictionary of user (user_id) to all retweets as list (linked_tweet) 
-user2urlSets = {}
+user2retweetSets = {}
 allUsers = set(labels)
 # onlyEntries in set
-dfInNetwork = df[df["user_id"].isin(allUsers)].dropna(subset=["urls"])
+dfInNetwork = df[df["user_id"].isin(allUsers)].dropna(subset=["linked_tweet"])
 
-for user,urls in tqdm(dfInNetwork[["user_id","urls"]].values):
-    if user in user2urlSets:
-        user2urlSets[user].update(urls)
+for user,linkedTweet in tqdm(dfInNetwork[["user_id","linked_tweet"]].values):
+    if user in user2retweetSets:
+        user2retweetSets[user].add(linkedTweet)
     else:
-        user2urlSets[user] = set(urls)
+        user2retweetSets[user] = set([linkedTweet])
 
-topOverlaps = []
-topSimilarities = []
-for edgeIndex in tqdm(topEdgeIndices[0:10]):
-    edge = allEdges[edgeIndex]
+overlaps = []
+for edgeIndex, edge in enumerate(tqdm(allEdges)):
     user1 = labels[edge[0]]
     user2 = labels[edge[1]]
     quantile = quantiles[edgeIndex]
-    if quantile > 0.0:
-        if user1 in user2urlSets and user2 in user2urlSets:
-            overlap = len(user2urlSets[user1].intersection(user2urlSets[user2]))
-            topOverlaps.append(overlap)
-            topSimilarities.append(similarities[edgeIndex])
+    if quantile > 0.99999:
+        if user1 in user2retweetSets and user2 in user2retweetSets:
+            overlap = len(user2retweetSets[user1].intersection(user2retweetSets[user2]))
+            overlaps.append(overlap)
 
-print("\n".join(map(str,list(zip(topOverlaps,topSimilarities)))))
-print("\n".join([f"{overlaps}:{overlapCount}" for overlaps,overlapCount in sorted(Counter(topOverlaps).items())]))
+print("\n".join([f"{overlaps}:{overlapCount}" for overlaps,overlapCount in sorted(Counter(overlaps).items())]))
 # printEdge(topEdges[100])
 
-dfOutput = pd.DataFrame(topEdges[0:10], columns=["user1","user2","score","type","similarity"])
-dfOutput.drop(columns=["type","similarity","score"], inplace=True)
-# save networkType_suspicious.csv
-dfOutput.to_csv(f"Outputs/Tables/{dataName}_{suffix}_{networkType}_suspicious.csv", index=False)
+
+
+# # create dictionary of user (user_id) to all retweets as list (linked_tweet) 
+# user2urlSets = {}
+# allUsers = set(labels)
+# # onlyEntries in set
+# dfInNetwork = df[df["user_id"].isin(allUsers)].dropna(subset=["urls"])
+
+# for user,urls in tqdm(dfInNetwork[["user_id","urls"]].values):
+#     if user in user2urlSets:
+#         user2urlSets[user].update(urls)
+#     else:
+#         user2urlSets[user] = set(urls)
+
+# topOverlaps = []
+# topSimilarities = []
+# for edgeIndex in tqdm(topEdgeIndices[0:10]):
+#     edge = allEdges[edgeIndex]
+#     user1 = labels[edge[0]]
+#     user2 = labels[edge[1]]
+#     quantile = quantiles[edgeIndex]
+#     if quantile > 0.0:
+#         if user1 in user2urlSets and user2 in user2urlSets:
+#             overlap = len(user2urlSets[user1].intersection(user2urlSets[user2]))
+#             topOverlaps.append(overlap)
+#             topSimilarities.append(similarities[edgeIndex])
+
+# print("\n".join(map(str,list(zip(topOverlaps,topSimilarities)))))
+# print("\n".join([f"{overlaps}:{overlapCount}" for overlaps,overlapCount in sorted(Counter(topOverlaps).items())]))
+# printEdge(topEdges[100])
+
+# dfOutput = pd.DataFrame(topEdges[0:10], columns=["user1","user2","score","type","similarity"])
+# dfOutput.drop(columns=["type","similarity","score"], inplace=True)
+# # save networkType_suspicious.csv
+# dfOutput.to_csv(f"Outputs/Tables/{dataName}_{suffix}_{networkType}_suspicious.csv", index=False)
 
