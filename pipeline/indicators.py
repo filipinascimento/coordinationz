@@ -27,7 +27,7 @@ import json
 if __name__ == "__main__": # Needed for parallel processing
 
     dataName = "sampled_20240226"
-    indicators = ["coretweet","cohashtag","courl"]
+    indicators = ["coretweet","cohashtag","courl","coretweetusers"]
 
     dataNameHelp = """Name of the dataset. A file named <dataName>.csv should be in the preprocessed datasets folder.
     if a dataName has a .csv extension, it will copy that file to the preprocessed datasets folder and use it."""
@@ -46,7 +46,7 @@ if __name__ == "__main__": # Needed for parallel processing
     suffix = args.suffix
 
     if("all" in indicators):
-        indicators = ["coretweet","cohashtag","courl","coretweetusers","textsimilarity"]
+        indicators = ["coretweet","cohashtag","courl","coretweetusers","coword","textsimilarity"]
     
     configPath = args.config
     if(configPath is not None):
@@ -106,7 +106,8 @@ if __name__ == "__main__": # Needed for parallel processing
         "coretweet": czind.obtainBipartiteEdgesRetweets,
         "cohashtag": czind.obtainBipartiteEdgesHashtags,
         "courl": czind.obtainBipartiteEdgesURLs,
-        "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
+        "coretweetusers": czind.obtainBipartiteEdgesRetweetsUser,
+        "coword": czind.obtainBipartiteEdgesWords,
         "textsimilarity": text_similarity_partial
     }
 
@@ -125,11 +126,13 @@ if __name__ == "__main__": # Needed for parallel processing
     generatedNetworks = {}
     for networkName in indicators:
         print(f"Creating the {networkName} network...")
-        bipartiteEdges = bipartiteMethod[networkName](df)
+
+        dfFiltered = czind.filterUsersByMinActivities(df,activityType=networkName, **runParameters["user"][networkName])
+        bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
         if(len(bipartiteEdges)==0):
             print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
             continue
-
+        
         bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
         # (user_ids, items)
         allUsers.update(set([userid for userid,_ in bipartiteEdges]))
@@ -148,16 +151,6 @@ if __name__ == "__main__": # Needed for parallel processing
             **runParameters["nullmodel"][networkName]
         )
         # print(runParameters["nullmodel"][networkName])
-        import matplotlib as plt
-        import matplotlib.pyplot as plt
-        similarities = nullModelOutput["similarities"]
-        plt.figure()
-        plt.scatter(similarities, nullModelOutput["quantiles"])
-        plt.xlabel("Similarity")
-        plt.ylabel("Quantile")
-        plt.title("Similarity vs Quantile")
-        plt.savefig(figuresPath / f"{dataName}_{suffix}_{networkName}_similarity_vs_quantile.png")
-        plt.close()
 
         # Create a network from the null model output with a pvalue threshold of 0.05
         g = cznet.createNetworkFromNullModelOutput(
@@ -167,9 +160,9 @@ if __name__ == "__main__": # Needed for parallel processing
             **runParameters["network"][networkName]
         )
             
-        if("category" in df.columns):
+        if("category" in dfFiltered.columns):
             # dictionary
-            user2category = dict(df[["user_id","category"]].drop_duplicates().values)
+            user2category = dict(dfFiltered[["user_id","category"]].drop_duplicates().values)
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
         xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")

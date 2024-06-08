@@ -45,6 +45,8 @@ minItemDegree = 1
 # total activity of the item for that indicator
 # e.g., minimum uses of a hashtag
 minItemStrength = 1
+# min number of activities (among all indicators) of a user
+minUserActivities = 10
 # p-value threshold for the network
 # pvalueThreshold = 0.01
 

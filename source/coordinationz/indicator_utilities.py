@@ -10,6 +10,34 @@ import numpy as np
 from collections import Counter
 
 from . import textsimilarity_helper as ts
+from nltk.corpus import stopwords
+import nltk
+import re
+
+
+def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
+    if minUserActivities > 0:
+        if(activityType == "any"):
+            userActivityCount = df["user_id"].value_counts()
+            usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        elif("retweet" in activityType.lower()):
+            userActivityCount = df[df["tweet_type"]=="retweet"]["user_id"].value_counts()
+            usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        elif("hashtag" in activityType.lower()):
+            # len(hashtags) should be >0
+            userActivityCount = df[df["hashtags"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
+            usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        elif("url" in activityType.lower()):
+            # len(urls) should be >0
+            userActivityCount = df[df["urls"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
+            usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        else:
+            # activity not retweet
+            userActivityCount = df[df["tweet_type"]!="retweet"]["user_id"].value_counts()
+            usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        df = df[df["user_id"].isin(usersWithMinActivities)]
+    return df
+  
 
 def obtainBipartiteEdgesRetweets(df):
     # keep only tweet_type == "retweet"
@@ -72,6 +100,30 @@ def obtainBipartiteEdgesHashtags(df,removeRetweets=True,removeQuotes=False,remov
     # create edges list users -> hashtags
     edges = [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     return edges
+  
+
+def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeReplies=False, ngramSize = 1):
+    if "text" not in df or "tweet_type" not in df or "user_id" not in df:
+        return []
+    
+    if(removeRetweets):
+        df = df[df["tweet_type"] != "retweet"]
+    if(removeQuotes):
+        df = df[df["tweet_type"] != "quote"]
+    if(removeReplies):
+        df = df[df["tweet_type"] != "reply"]
+
+    # convert url strings that looks like lists to actual lists
+    users = df["user_id"]
+    tokens = df["text"].apply(lambda x: tokenizeTweet(x,ngram_range=(1,ngramSize)))
+    # keep only non-empty lists
+    mask = tokens.apply(lambda x: len(x) > 0)
+    tokens = tokens[mask]
+    users = users[mask]
+    # create edges list users -> hashtags
+    edges = [(user,token) for user,token_list in zip(users,tokens) for token in token_list]
+    return edges
+  
 
 def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999):
     embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
@@ -80,6 +132,7 @@ def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activi
     bipartite_edges = ts.get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=n_buckets, seed=seed)
 
     return bipartite_edges
+  
 
 def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
     # goes from right to left
@@ -131,6 +184,26 @@ def parseParameters(config,indicators):
     if "output" in config:
         outputConfig = config["output"]
     
+    userFilterParametersMap = {
+        "minUserActivities":("minUserActivities",1),
+    }
+    
+    generalUserFilterOptions = {}
+    for key, (param, default) in userFilterParametersMap.items():
+        if key in indicatorConfig:
+            generalUserFilterOptions[param] = indicatorConfig[key]
+        else:
+            generalUserFilterOptions[param] = default
+
+    specificUserFilterOptions = {}
+    for indicator in indicators:
+        specificConfig = {}
+        if indicator in indicatorConfig:
+            for key, (param, default) in userFilterParametersMap.items():
+                if key in indicatorConfig[indicator]:
+                    specificConfig[param] = indicatorConfig[indicator][key]
+        specificUserFilterOptions[indicator] = {**generalUserFilterOptions, **specificConfig}
+
     # name to (key, default value)
     nodeFilterParametersMap = {
         "minItemDegree":("minRightDegree",1),
@@ -243,6 +316,7 @@ def parseParameters(config,indicators):
             generalOutputOptions[param] = default
 
     returnValue = {}
+    returnValue["user"] = specificUserFilterOptions
     returnValue["filter"] = specificFilterOptions
     returnValue["network"] = specificNetworkOptions
     returnValue["nullmodel"] = specificNullModelOptions
@@ -326,11 +400,16 @@ def mergeNetworks(networksDictionary,
             mergedNetwork.es["1-pvalue"] = pvalueTransformed
             combineEdges["1-pvalue"] = "product"
         if("quantile" in mergedNetwork.es.attributes()):
-            combineEdges["quantile"] = "product"
+            quantileTransformed = 1-np.array(mergedNetwork.es["quantile"])
+            mergedNetwork.es["1-quantile"] = quantileTransformed
+            combineEdges["1-quantile"] = "product"
         # type concatenate
         # sort and concatenate
         combineEdges["Type"] = lambda x: "-".join(sorted(x))
         mergedNetwork = mergedNetwork.simplify(combine_edges=combineEdges)
+        if("1-quantile" in mergedNetwork.es.attributes()):
+            mergedNetwork.es["quantile"] = 1-np.array(mergedNetwork.es["1-quantile"])
+            del mergedNetwork.es["1-quantile"]
         # print("--------")
         # print(f"Using {weightAttribute} as the weight attribute")
         # print("--------")
@@ -345,7 +424,7 @@ def mergeNetworks(networksDictionary,
         mask &= np.array(mergedNetwork.es["pvalue"]) < pvalueThreshold
     if(quantileThreshold > 0.0):
         mask &= np.array(mergedNetwork.es["quantile"]) > quantileThreshold
-
+    mergedNetwork.delete_edges(np.where(mask == False)[0])
     return mergedNetwork
 
 def mergedSuspiciousClusters(mergedNetwork, ):
@@ -417,3 +496,112 @@ def generateEdgesINCASOutput(mergedNetwork, allUsers,
         users = [coordinated,non_coordinated]
         outputs[f"{threshold}"] = {"segments":users}
     return outputs
+
+
+
+
+def suspiciousTables(df,mergedNetwork,
+                thresholdAttribute = "quantile",
+                thresholds = [0.95,0.99]):
+    outputs = {}
+    for threshold in thresholds:
+        edgesData = []
+        labels = mergedNetwork.vs["Label"]
+        if "similarity" in mergedNetwork.es.attributes():
+            similarities = mergedNetwork.es["similarity"]
+        else:
+            similarities = mergedNetwork.es["weight"]
+        if "Type" in mergedNetwork.es.attributes():
+            edgeTypes = mergedNetwork.es["Type"]
+        else:
+            edgeTypes = ["NA"] * len(similarities)
+        quantiles = mergedNetwork.es[thresholdAttribute]
+        edgeList = mergedNetwork.get_edgelist()
+        # sort edgeList and quantiles by quantiles
+        edgeList,quantiles,similarities,edgeTypes = zip(*sorted(zip(edgeList,quantiles,similarities,edgeTypes), key=lambda x: x[1], reverse=True))
+        
+        for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
+            fromLabel = labels[fromIndex]
+            toLabel = labels[toIndex]
+            if(thresholdAttribute=="pvalue"):
+                if quantiles[edgeIndex] < threshold:
+                    edgesData.append((fromLabel, toLabel,quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex]))
+            else:
+                if quantiles[edgeIndex] > threshold:
+                    edgesData.append((fromLabel, toLabel,quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex]))
+        uniqueUsers = set([user for edge in edgesData for user in edge[:2]])
+        dfEdges = pd.DataFrame(edgesData, columns=["From","To","Quantile","Similarity","Type"])
+        dfFiltered = df[df["user_id"].isin(uniqueUsers)]
+        outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
+    return outputs
+
+
+def remove_emoji(string):
+    emoji_pattern = re.compile("["
+                           u"\U0001F600-\U0001F64F"  # emoticons
+                           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                           u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                           u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                           u"\U00002702-\U000027B0"
+                           u"\U000024C2-\U0001F251"
+                           "]+", flags=re.UNICODE)
+    return emoji_pattern.sub(r'', string)
+
+def tokenizeTweet(text, ngram_range=(1,2)):
+    # check if nltk stopwords are available, if not download
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        nltk.download('stopwords')
+    #Load English Stop Words
+    stopword = stopwords.words('english')
+    stopword = set(stopword)
+    stopword.add("https")
+    stopword.add("co")
+    # Cleaning tweets in en language
+    # Removing RT Word from Messages
+    text=text.lstrip('RT')
+    text=text.replace( ":",' ')
+    text=text.replace( ";",' ')
+    text=text.replace( ".",' ')
+    text=text.replace( ",",' ')
+    text=text.replace( "!",' ')
+    text=text.replace( "&",' ')
+    text=text.replace( "-",' ')
+    text=text.replace( "_",' ')
+    text=text.replace( "$",' ')
+    text=text.replace( "/",' ')
+    text=text.replace( "?",' ')
+    text=text.replace( "''",' ')
+    text=text.lower()
+    #Remove URL
+    text = re.sub(r'https?://\S+|www\.\S+', " ", text)
+    #Remove Mentions
+    text = re.sub(r'@\w+',' ',text)
+    #Remove Digits
+    text = re.sub(r'\d+', ' ', text)
+    #Remove HTML tags
+    text = re.sub('r<.*?>',' ', text)
+    #Remove HTML tags
+    text = re.sub('r<.*?>',' ', text)
+    #Remove Emoji from text
+    text = remove_emoji(text)
+    #Remove hashtags
+    text = re.sub(r'#\w+', ' ', text)
+    #Remove Punctuation
+    text = re.sub(r'[^\w\s]', ' ', text)
+    #Remove Extra Spaces
+    text = re.sub(r'\s+', ' ', text)
+    # remove stopwords
+    text = ' '.join([word for word in text.split() if word not in stopword])
+    # tokenize
+    tokens = text.split()
+    # also include n-grams of size defined by ngram_range
+    ngrams = []
+    for n in range(ngram_range[0],ngram_range[1]+1):
+        ngrams.extend([" ".join(tokens[i:i+n]) for i in range(len(tokens)-n+1)])
+    return ngrams
+
+
+
+
