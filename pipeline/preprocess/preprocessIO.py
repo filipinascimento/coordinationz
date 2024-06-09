@@ -49,7 +49,7 @@ if __name__ == "__main__": # Needed for parallel processing
     czpre.preprocessIOData(dataName, IODataPath, preprocessedFilePath)
   
     print("Loading preprocessed data for testing...")
-    df = czpre.loadPreprocessedData(dataName)
+    df = czpre.loadPreprocessedData(dataName, config=config)
 
     report = czpre.generateReport(df)
 

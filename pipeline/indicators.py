@@ -46,7 +46,7 @@ if __name__ == "__main__": # Needed for parallel processing
     suffix = args.suffix
 
     if("all" in indicators):
-        indicators = ["coretweet","cohashtag","courl","coretweetusers","coword"]
+        indicators = ["coretweet","cohashtag","courl","coretweetusers","coword","textsimilarity"]
     
     configPath = args.config
     if(configPath is not None):
@@ -92,18 +92,23 @@ if __name__ == "__main__": # Needed for parallel processing
     configsPath = Path(config["paths"]["CONFIGS"]).resolve()
     configsPath.mkdir(parents=True, exist_ok=True)
 
+    figuresPath = Path(config["paths"]["FIGURES"]).resolve()
+    figuresPath.mkdir(parents=True, exist_ok=True)
 
     tablesPath = Path(config["paths"]["TABLES"]).resolve()
     tablesPath.mkdir(parents=True, exist_ok=True)
+
+    def text_similarity_partial(df):
+        return czind.obtainBipartiteEdgesTextSimilarity(df, dataName, **config["indicator"]["textsimilarity"])
 
     # Available indicators
     bipartiteMethod = {
         "coretweet": czind.obtainBipartiteEdgesRetweets,
         "cohashtag": czind.obtainBipartiteEdgesHashtags,
         "courl": czind.obtainBipartiteEdgesURLs,
-        "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
-        "coword": czind.obtainBipartiteEdgesWords
-
+        "coretweetusers": czind.obtainBipartiteEdgesRetweetsUser,
+        "coword": czind.obtainBipartiteEdgesWords,
+        "textsimilarity": text_similarity_partial
     }
 
     runParameters = czind.parseParameters(config,indicators)
@@ -146,7 +151,6 @@ if __name__ == "__main__": # Needed for parallel processing
             **runParameters["nullmodel"][networkName]
         )
         # print(runParameters["nullmodel"][networkName])
-
 
         # Create a network from the null model output with a pvalue threshold of 0.05
         g = cznet.createNetworkFromNullModelOutput(
