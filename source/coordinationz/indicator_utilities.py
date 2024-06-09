@@ -136,10 +136,6 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
         nltk.data.find('corpora/stopwords')
     except LookupError:
         nltk.download('stopwords')
-    try:
-        nltk.data.find('corpora/stopwords')
-    except LookupError:
-        nltk.download('stopwords')
     
     # Load English Stop Words
     stopword_set = set(stopwords.words('english'))
@@ -155,7 +151,7 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
 
     # Use spaCy to tokenize and lemmatize
     doc = nlp(text)
-    tokens = [token.lemma_ for token in doc if token.lemma_ not in stopword_set and not token.is_punct and not token.is_space]
+    tokens = [token.lemma_ for token in doc if token.lemma_.lower() not in stopword_set and not token.is_punct and not token.is_space]
     # Include n-grams of size defined by ngram_range
     ngrams = []
     for n in range(ngram_range[0], ngram_range[1] + 1):
