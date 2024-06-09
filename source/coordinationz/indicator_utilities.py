@@ -159,7 +159,7 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
     # Include n-grams of size defined by ngram_range
     ngrams = []
     for n in range(ngram_range[0], ngram_range[1] + 1):
-        ngrams.extend([" ".join(tokens[i:i+n]) for i in range(len(tokens) - n + 1)])
+        ngrams.extend([" ".join(tokens[i:i+n]).lower() for i in range(len(tokens) - n + 1)])
     return ngrams
 
 
