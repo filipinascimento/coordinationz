@@ -99,7 +99,11 @@ if __name__ == "__main__": # Needed for parallel processing
     tablesPath.mkdir(parents=True, exist_ok=True)
 
     def text_similarity_partial(df):
-        return czind.obtainBipartiteEdgesTextSimilarity(df, dataName, **config["indicator"]["textsimilarity"])
+        if "textsimilarity" in config["indicator"]:
+            parameters = config["indicator"]["textsimilarity"]
+        else:
+            parameters = {}
+        return czind.obtainBipartiteEdgesTextSimilarity(df, dataName, **parameters)
 
     # Available indicators
     bipartiteMethod = {

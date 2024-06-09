@@ -68,17 +68,22 @@ df["contentText"] = df["text"]
 if("data_translatedContentText" in df):
     df["contentText"] = df["data_translatedContentText"]
     # for the nans, use the original text
-    mask = df["text"].isna()
+    mask = df["contentText"].isna()
     df.loc[mask,"contentText"] = df["text"][mask]
 
+
 typeToSuffix = {
-    "merged":"all",
-    "coretweet":"all",
-    "cohashtag":"all",
-    "courl":"all",
-    "coword":"all",
-    # "usctextsimilarity":"all"
+    # ("merged","all"),
+    # ("coretweet","all"),
+    # ("cohashtag","all"),
+    # ("courl","all"),
+    # ("coword","all"),
+    # ("merged","alltextsim"),
+    ("textsimilarity","alltextsim"),
+    ("merged","allusc"),
+    ("usctextsimilarity","allusc"),
 }
+
 
 
 preprocessPath = Path(config["paths"]["PREPROCESSED_DATASETS"])
@@ -104,7 +109,7 @@ def getTokens(tweetID,text):
 
 
 
-for networkType,suffix in typeToSuffix.items():
+for networkType,suffix in typeToSuffix:
     networkPath = networksPath/f"{dataName}_{suffix}_{networkType}.xnet"
     g = xn.load(networkPath)
 
@@ -179,7 +184,8 @@ for networkType,suffix in typeToSuffix.items():
     plt.close()
 
 
-    for threshold in [0.990, 0.999, 0.9995, 0.9999, 0.99995, 0.99999]:
+    # for threshold in [0.990, 0.999, 0.9995, 0.9999, 0.99995, 0.99999]:
+    for threshold in [0.990, 0.999]:
         thresholdAttribute = "quantile"
         
 
@@ -212,15 +218,15 @@ for networkType,suffix in typeToSuffix.items():
         dfInNetworkRetweets = dfRetweets.dropna(subset=["linked_tweet"])
         # for tokens use czind.tokenizeTweet(string)
 
-        dfInNetworkTokens = dfOriginal.dropna(subset=["text"])
+        dfInNetworkTokens = dfOriginal.dropna(subset=["contentText"])
         # use translated 
         # apply getTokens to text, tweet_id
-        dfInNetworkTokens["tokens"] = dfInNetworkTokens[["tweet_id","text"]].progress_apply(lambda x: getTokens(*x),axis=1)
-        dfInNetworkRetweetTokens = dfInNetworkRetweets.dropna(subset=["text"])
+        dfInNetworkTokens["tokens"] = dfInNetworkTokens[["tweet_id","contentText"]].progress_apply(lambda x: getTokens(*x),axis=1)
+        dfInNetworkRetweetTokens = dfInNetworkRetweets.dropna(subset=["contentText"])
         if(dfInNetworkRetweetTokens.empty):
             dfInNetworkRetweetTokens["tokens"] = []
         else:
-            dfInNetworkRetweetTokens["tokens"] = dfInNetworkRetweetTokens[["tweet_id","text"]].progress_apply(lambda x: getTokens(*x),axis=1)
+            dfInNetworkRetweetTokens["tokens"] = dfInNetworkRetweetTokens[["tweet_id","contentText"]].progress_apply(lambda x: getTokens(*x),axis=1)
 
         user2urlCounter = {}
         user2hashtagsCounter = {}
