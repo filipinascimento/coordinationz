@@ -50,6 +50,10 @@ minUserActivities = 10
 # p-value threshold for the network
 # pvalueThreshold = 0.01
 
+[indicator.textsimilarity]
+n_buckets = 5000
+min_activity = 10
+cache_path = "Data/Cache"
 
 # Specific settings for indicators
 # will overwrite the general settings
