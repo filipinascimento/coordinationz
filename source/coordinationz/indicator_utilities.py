@@ -9,6 +9,8 @@ import ast
 import numpy as np
 from collections import Counter
 
+from nltk.corpus import stopwords
+import nltk
 import re
 import spacy
 import nltk
@@ -38,7 +40,7 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         df = df[df["user_id"].isin(usersWithMinActivities)]
     return df
-
+  
 
 def obtainBipartiteEdgesRetweets(df):
     # keep only tweet_type == "retweet"
@@ -101,8 +103,7 @@ def obtainBipartiteEdgesHashtags(df,removeRetweets=True,removeQuotes=False,remov
     # create edges list users -> hashtags
     edges = [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     return edges
-
-
+  
 
 try:
     nlp = spacy.load('en_core_web_lg')
@@ -191,7 +192,17 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
     # create edges list users -> hashtags
     edges = [(user,token) for user,token_list in zip(users,tokens) for token in token_list]
     return edges
+  
 
+def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999):
+    from . import textsimilarity_helper as ts
+    embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
+    embed_keys, sentence_embeddings = ts.filter_active(df, embed_keys, sentence_embeddings, min_activity=min_activity, column=column)
+
+    bipartite_edges = ts.get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=n_buckets, seed=seed)
+
+    return bipartite_edges
+  
 
 def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
     # goes from right to left

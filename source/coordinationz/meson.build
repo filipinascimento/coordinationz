@@ -10,6 +10,7 @@ py_sources = files(
     'indicator_utilities.py',
     'cohashtag_helper.py',
     'visualization.py',
+    'textsimilarity_helper.py',
     'usc_text_similarity.py',
 )
 
