@@ -12,6 +12,7 @@ import coordinationz.indicator_utilities as czind
 import coordinationz.network as cznet
 import sys
 import argparse
+import pickle
 import shutil
 import json
 from collections import Counter
@@ -20,10 +21,8 @@ from functools import partial
 import matplotlib.pyplot as plt
 
 dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
-networkType = "merged"
-suffix = "all"
-
 configPath = None
+tqdm.pandas()
 
 if(configPath is not None):
     config = cz.load_config(configPath)
@@ -65,6 +64,12 @@ tablesOutputPath = Path(config["paths"]["TABLES"]).resolve()
 figuresOutputPath = Path(config["paths"]["FIGURES"]).resolve()
 
 df = czpre.loadPreprocessedData(dataName, config=config)
+df["contentText"] = df["text"]
+if("data_translatedContentText" in df):
+    df["contentText"] = df["data_translatedContentText"]
+    # for the nans, use the original text
+    mask = df["text"].isna()
+    df.loc[mask,"contentText"] = df["text"][mask]
 
 typeToSuffix = {
     "merged":"all",
@@ -72,12 +77,49 @@ typeToSuffix = {
     "cohashtag":"all",
     "courl":"all",
     "coword":"all",
+    # "usctextsimilarity":"all"
 }
+
+
+preprocessPath = Path(config["paths"]["PREPROCESSED_DATASETS"])
+onlyInSynthPath = preprocessPath/f"{dataName}_onlyInSynth.pkl"
+if(onlyInSynthPath.exists()):
+    with open(onlyInSynthPath, "rb") as f:
+        onlyInSynth = pickle.load(f)
+        newUsersInSynth = onlyInSynth["newUsers"]
+        usersWithNewTweetsInSynth = onlyInSynth["usersWithNewTweets"]
+else:
+    newUsersInSynth = set()
+    usersWithNewTweetsInSynth = set()
+
+
+tweetID2Tokens = {}
+def getTokens(tweetID,text):
+    if(tweetID in tweetID2Tokens):
+        return tweetID2Tokens[tweetID]
+    tokens = czind.tokenizeTweet(text,ngram_range=(1,3))
+    tweetID2Tokens[tweetID] = tokens
+    return tokens
+
+
+
 
 for networkType,suffix in typeToSuffix.items():
     networkPath = networksPath/f"{dataName}_{suffix}_{networkType}.xnet"
     g = xn.load(networkPath)
 
+
+
+    if newUsersInSynth:
+        g.vs["Synthetic"] = ["Natural"]*g.vcount()
+        # newUsersInSynt
+        # usersWithNewTweetsInSynth
+        for userIndex in range(g.vcount()):
+            user = g.vs[userIndex]
+            if user["Label"] in newUsersInSynth:
+                user["Synthetic"] = "New Synth User"
+            elif user["Label"] in usersWithNewTweetsInSynth:
+                user["Synthetic"] = "New Synth Tweets"
 
     quantiles = np.array(g.es["quantile"])
     if("similarity" in g.es.attributes()):
@@ -137,7 +179,7 @@ for networkType,suffix in typeToSuffix.items():
     plt.close()
 
 
-    for threshold in [0.999,0.9995,0.9999,0.99995,0.99999]:
+    for threshold in [0.990, 0.999, 0.9995, 0.9999, 0.99995, 0.99999]:
         thresholdAttribute = "quantile"
         
 
@@ -152,7 +194,9 @@ for networkType,suffix in typeToSuffix.items():
         gThresholded.delete_edges(np.where(mask == False)[0])
         # remove degree 0 nodes
         gThresholded.delete_vertices(gThresholded.vs.select(_degree=0))
-        gThresholded.vs["CommunityIndex"] = gThresholded.community_leiden(objective_function = "modularity").membership
+        gThresholded.vs["CommunityIndex"] = gThresholded.community_leiden(objective_function = "modularity",
+                                                                        weights = "weight",
+                                                                        ).membership
         gThresholded.vs["CommunityLabel"] = [f"{i}" for i in gThresholded.vs["CommunityIndex"]]
         thresholdedNetworkPath = networksPath/f"{dataName}_{suffix}_{networkType}_thres_{thresholdAttribute}_{threshold}.xnet"
 
@@ -167,10 +211,16 @@ for networkType,suffix in typeToSuffix.items():
         dfInNetworkHashtags = dfOriginal.dropna(subset=["hashtags"])
         dfInNetworkRetweets = dfRetweets.dropna(subset=["linked_tweet"])
         # for tokens use czind.tokenizeTweet(string)
+
         dfInNetworkTokens = dfOriginal.dropna(subset=["text"])
-        dfInNetworkTokens["tokens"] = dfInNetworkTokens["text"].apply(partial(czind.tokenizeTweet,ngram_range=(1,3)))
+        # use translated 
+        # apply getTokens to text, tweet_id
+        dfInNetworkTokens["tokens"] = dfInNetworkTokens[["tweet_id","text"]].progress_apply(lambda x: getTokens(*x),axis=1)
         dfInNetworkRetweetTokens = dfInNetworkRetweets.dropna(subset=["text"])
-        dfInNetworkRetweetTokens["tokens"] = dfInNetworkRetweetTokens["text"].apply(partial(czind.tokenizeTweet,ngram_range=(1,3)))
+        if(dfInNetworkRetweetTokens.empty):
+            dfInNetworkRetweetTokens["tokens"] = []
+        else:
+            dfInNetworkRetweetTokens["tokens"] = dfInNetworkRetweetTokens[["tweet_id","text"]].progress_apply(lambda x: getTokens(*x),axis=1)
 
         user2urlCounter = {}
         user2hashtagsCounter = {}
@@ -321,19 +371,31 @@ for networkType,suffix in typeToSuffix.items():
             community2RetweetTokensRelativeDifferenceCounter[community] = Counter()
             for url in community2urlCounter[community]:
                 incommunityRelativeFrequency = community2urlCounter[community][url]/community2urlSumTotal[community]
-                outcommunityRelativeFrequency = (url2TotalCounts[url] - community2urlCounter[community][url])/(urlSumCount - community2urlSumTotal[community])
+                if (urlSumCount - community2urlSumTotal[community]) == 0:
+                    outcommunityRelativeFrequency = url2TotalCounts[url]
+                else:
+                    outcommunityRelativeFrequency = (url2TotalCounts[url] - community2urlCounter[community][url])/(urlSumCount - community2urlSumTotal[community])
                 community2urlRelativeDifferenceCounter[community][url] = transform(incommunityRelativeFrequency) - penaltyFactor*transform(outcommunityRelativeFrequency)
             for hashtag in community2hashtagsCounter[community]:
                 incommunityRelativeFrequency = community2hashtagsCounter[community][hashtag]/community2hashtagsSumTotal[community]
-                outcommunityRelativeFrequency = (hashtag2TotalCounts[hashtag] - community2hashtagsCounter[community][hashtag])/(hashtagSumCount - community2hashtagsSumTotal[community])
+                if (hashtagSumCount - community2hashtagsSumTotal[community]) == 0:
+                    outcommunityRelativeFrequency = hashtag2TotalCounts[hashtag]
+                else:
+                    outcommunityRelativeFrequency = (hashtag2TotalCounts[hashtag] - community2hashtagsCounter[community][hashtag])/(hashtagSumCount - community2hashtagsSumTotal[community])
                 community2hashtagsRelativeDifferenceCounter[community][hashtag] = transform(incommunityRelativeFrequency) - penaltyFactor*transform(outcommunityRelativeFrequency)
             for retweet in community2retweetsCounter[community]:
                 incommunityRelativeFrequency = community2retweetsCounter[community][retweet]/community2retweetsSumTotal[community]
-                outcommunityRelativeFrequency = (retweet2TotalCounts[retweet] - community2retweetsCounter[community][retweet])/(retweetSumCount - community2retweetsSumTotal[community])
+                if (retweetSumCount - community2retweetsSumTotal[community]) == 0:
+                    outcommunityRelativeFrequency = retweet2TotalCounts[retweet]
+                else:
+                    outcommunityRelativeFrequency = (retweet2TotalCounts[retweet] - community2retweetsCounter[community][retweet])/(retweetSumCount - community2retweetsSumTotal[community])
                 community2retweetsRelativeDifferenceCounter[community][retweet] = transform(incommunityRelativeFrequency) - penaltyFactor*transform(outcommunityRelativeFrequency)
             for token in community2tokensCounter[community]:
                 incommunityRelativeFrequency = community2tokensCounter[community][token]/community2tokensSumTotal[community]
-                outcommunityRelativeFrequency = (token2TotalCounts[token] - community2tokensCounter[community][token])/(tokenSumCount - community2tokensSumTotal[community])
+                if (tokenSumCount - community2tokensSumTotal[community]) == 0:
+                    outcommunityRelativeFrequency = token2TotalCounts[token]
+                else:
+                    outcommunityRelativeFrequency = (token2TotalCounts[token] - community2tokensCounter[community][token])/(tokenSumCount - community2tokensSumTotal[community])
                 # if(community==1 and token=="china"):
                 #     print("incommunityCount:", community2tokensCounter[community][token])
                 #     print("incommunityTotal:", community2tokensSumTotal[community])
@@ -345,7 +407,11 @@ for networkType,suffix in typeToSuffix.items():
                 community2tokensRelativeDifferenceCounter[community][token] = transform(incommunityRelativeFrequency) - penaltyFactor*transform(outcommunityRelativeFrequency)
             for token in community2RetweetTokensCounter[community]:
                 incommunityRelativeFrequency = community2RetweetTokensCounter[community][token]/community2RetweetTokensSumTotal[community]
-                outcommunityRelativeFrequency = (retweetToken2TotalCounts[token] - community2RetweetTokensCounter[community][token])/(retweetTokenSumCount - community2RetweetTokensSumTotal[community])
+                if (retweetTokenSumCount - community2RetweetTokensSumTotal[community]) == 0:
+                    outcommunityRelativeFrequency = retweetToken2TotalCounts[token]
+                else:
+                    outcommunityRelativeFrequency = (retweetToken2TotalCounts[token] - community2RetweetTokensCounter[community][token])/(retweetTokenSumCount - community2RetweetTokensSumTotal[community])
+
                 community2RetweetTokensRelativeDifferenceCounter[community][token] = transform(incommunityRelativeFrequency) - penaltyFactor*transform(outcommunityRelativeFrequency)
 
         # 0.05517002081887578-0.21999104936469946

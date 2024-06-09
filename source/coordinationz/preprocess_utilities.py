@@ -8,6 +8,7 @@ import os
 from . import config
 from pathlib import Path
 import csv
+import unalix
 
 dropped_columns = [
     "author",
@@ -271,7 +272,7 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
             df["hashtags"] = df["hashtags"].map(lambda x: x if x == x and x is not None else [])
             # apply that for mentioned users and urls
             df["mentioned_users"] = df["mentioned_users"].map(lambda x: x if x == x and x is not None else [])
-            df["urls"] = df["urls"].map(lambda x: x if x == x and x is not None else [])
+            df["urls"] = df["urls"].map(lambda x: [unalix.clear_url(url) for url in x] if x == x and x is not None else [])
             
             if(firstTime):
                 df.to_csv(preprocessedFilePath, index=False,escapechar='\\', encoding='utf-8',quoting=csv.QUOTE_NONNUMERIC)
