@@ -132,3 +132,22 @@ def createNetworkFromNullModelOutput(nullModelOutput,
     return g
 
 
+
+def removeSingletons(g):
+    """
+    Removes singleton nodes from the graph
+
+    Parameters:
+    -----------
+    g: igraph.Graph
+        The graph to remove singleton nodes from
+
+    Returns:
+    --------
+    igraph.Graph
+        The graph with singleton nodes removed
+    """
+
+    gCopy = g.copy()
+    gCopy.delete_vertices(gCopy.vs.select(_degree = 0))
+    return gCopy

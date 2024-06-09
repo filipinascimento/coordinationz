@@ -103,7 +103,6 @@ if __name__ == "__main__": # Needed for parallel processing
         "courl": czind.obtainBipartiteEdgesURLs,
         "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
         "coword": czind.obtainBipartiteEdgesWords
-
     }
 
     runParameters = czind.parseParameters(config,indicators)
@@ -123,44 +122,48 @@ if __name__ == "__main__": # Needed for parallel processing
         print(f"Creating the {networkName} network...")
 
         dfFiltered = czind.filterUsersByMinActivities(df,activityType=networkName, **runParameters["user"][networkName])
-        bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
-        if(len(bipartiteEdges)==0):
-            print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
-            continue
-        
-        bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
-        # (user_ids, items)
-        allUsers.update(set([userid for userid,_ in bipartiteEdges]))
 
-        if(len(bipartiteEdges)==0):
-            print(f"\n-------\nWARNING: No {networkName} edges found after filtering.\n-------\n")
-            continue
-        
-        
-        # bipartiteEdges.to_csv(networksPath/f"{dataName}_{networkName}_bipartiteEdges.csv", index=False)
-        # creates a null model output from the bipartite graph
-        nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
-            bipartiteEdges,
-            returnDegreeSimilarities=False, # will return the similarities of the nodes
-            returnDegreeValues=True, # will return the degrees of the nodes
-            **runParameters["nullmodel"][networkName]
-        )
-        # print(runParameters["nullmodel"][networkName])
+        if(networkName=="usctextsimilarity"):
+            import coordinationz.usc_text_similarity as cztext
+            g = cztext.text_similarity(dfFiltered)
+        else:
+            bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
+            if(len(bipartiteEdges)==0):
+                print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
+                continue
+            
+            bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
+            # (user_ids, items)
+            allUsers.update(set([userid for userid,_ in bipartiteEdges]))
+
+            if(len(bipartiteEdges)==0):
+                print(f"\n-------\nWARNING: No {networkName} edges found after filtering.\n-------\n")
+                continue
+            
+            
+            # bipartiteEdges.to_csv(networksPath/f"{dataName}_{networkName}_bipartiteEdges.csv", index=False)
+            # creates a null model output from the bipartite graph
+            nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
+                bipartiteEdges,
+                returnDegreeSimilarities=False, # will return the similarities of the nodes
+                returnDegreeValues=True, # will return the degrees of the nodes
+                **runParameters["nullmodel"][networkName]
+            )
+            # print(runParameters["nullmodel"][networkName])
 
 
-        # Create a network from the null model output with a pvalue threshold of 0.05
-        g = cznet.createNetworkFromNullModelOutput(
-            nullModelOutput,
-            # useZscoreWeights = True,
-            # usePValueWeights = True,
-            **runParameters["network"][networkName]
-        )
+            # Create a network from the null model output with a pvalue threshold of 0.05
+            g = cznet.createNetworkFromNullModelOutput(
+                nullModelOutput,
+                **runParameters["network"][networkName]
+            )
             
         if("category" in dfFiltered.columns):
             # dictionary
             user2category = dict(dfFiltered[["user_id","category"]].drop_duplicates().values)
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
+        g = cznet.removeSingletons(g)
         xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
         generatedNetworks[networkName] = g
     

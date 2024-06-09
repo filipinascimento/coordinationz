@@ -62,7 +62,7 @@ minUserActivities = 10
 # minItemDegree = 5
 # minItemStrength = 10
 
-["merging"] 
+["merging"]
 method = "quantile" #method used for merging the networks. Only pvalue is available for now
 shouldAggregate = true
 weightAttribute = "quantile"
@@ -73,5 +73,5 @@ similarityThreshold = 0.0
 
 ["output"]
 thresholdAttribute = "quantile"
-thresholds = [0.95,0.99,0.999,0.9999]
+thresholds = [0.95,0.99,0.995,0.999,0.9995,0.9999]
 
