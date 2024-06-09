@@ -32,7 +32,9 @@ dependencies = [
   "tqdm",
   "toml",
   "python-igraph",
-  "xnetwork"
+  "xnetwork",
+  "nltk",
+  "unalix"
 ]
 
 

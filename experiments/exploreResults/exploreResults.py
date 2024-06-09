@@ -17,9 +17,10 @@ import json
 from collections import Counter
 
 dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
-networkType = "cohashtag"
+networkType = "merged"
 suffix = "all"
-
+thresholdAttribute = "quantile"
+threshold = 0.9995
 configPath = None
 
 if(configPath is not None):
@@ -34,7 +35,7 @@ else:
     # print("------")
 
 networksPath = Path(config["paths"]["NETWORKS"]).resolve()
-networkPath = networksPath/f"{dataName}_{suffix}_{networkType}.xnet"
+networkPath = networksPath/f"{dataName}_{suffix}_{networkType}_thres_{thresholdAttribute}_{threshold}.xnet"
 
 df = czpre.loadPreprocessedData(dataName, config=config)
 
@@ -98,7 +99,7 @@ quantiles = np.array(g.es["quantile"])
 # plt.close()
 
 
-topEdgeIndices = np.argsort(scores)[-200:]
+topEdgeIndices = np.argsort(scores)
 # reverse the order to get the top 20
 topEdgeIndices = topEdgeIndices[::-1]
 allEdges = g.get_edgelist()
@@ -115,14 +116,29 @@ for edgeIndex in topEdgeIndices:
     topEdges.append((labels[edge[0]], labels[edge[1]], score, edgeType, similarity))
     
 
+user2Community = {user:int(community) for user,community in zip(g.vs["Label"],g.vs["CommunityIndex"])}
+
+user2CommunityDescriptions = {}
+for attribute in g.vs.attributes():
+    if(attribute.startswith("Surprising")):
+        user2CommunityDescriptions[attribute] = {user:community for user,community in zip(g.vs["Label"],g.vs[attribute])}
+
+
 def printEdge(edge):
     user1 = edge[0]
     user2 = edge[1]
     score = edge[2]
+    community1 = user2Community[user1]
+    community2 = user2Community[user2]
     edgeType = edge[3]
     similarity = edge[4]
     print(f"{user1} - {user2}")
     print(f"({edgeType}) : {score} (sim. {similarity})")
+    print("Communities: ", community1, community2)
+    print("Community descriptions:")
+    for attribute, user2description in user2CommunityDescriptions.items():
+        print(f"\t{attribute}:\n\t\tuser1: {user2description[user1]}\n\t\tuser2:{user2description[user2]}")
+
     # [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     # pandas has user_id, tweet_type, hashtags, urls, text
     user1Data = df[df["user_id"] == user1]
@@ -133,20 +149,20 @@ def printEdge(edge):
     hashtags1 = Counter([hashtag for hashtagsList in hashtagsLists1 for hashtag in hashtagsList])
     hashtags2 = Counter([hashtag for hashtagsList in hashtagsLists2 for hashtag in hashtagsList])
     # calculate cosine similarity between two users via hashtag
-    numerator = sum([hashtags1[hashtag] * hashtags2[hashtag] for hashtag in hashtags1.keys() if hashtag in hashtags2.keys()])
-    denominator = np.sqrt(sum([hashtags1[hashtag]**2 for hashtag in hashtags1.keys()]) * sum([hashtags2[hashtag]**2 for hashtag in hashtags2.keys()]))
-    cosineSimilarity = numerator / denominator
-    print("\t Hashtags cosine similarity:", cosineSimilarity)
+    # numerator = sum([hashtags1[hashtag] * hashtags2[hashtag] for hashtag in hashtags1.keys() if hashtag in hashtags2.keys()])
+    # denominator = np.sqrt(sum([hashtags1[hashtag]**2 for hashtag in hashtags1.keys()]) * sum([hashtags2[hashtag]**2 for hashtag in hashtags2.keys()]))
+    # cosineSimilarity = numerator / denominator
+    # print("\t Hashtags cosine similarity:", cosineSimilarity)
 
     linkedIDsList1 = user1Data[user1Data.tweet_type=="retweet"]["linked_tweet"].values
     linkedIDsList2 = user2Data[user2Data.tweet_type=="retweet"]["linked_tweet"].values
     linkedIDs1 = Counter(linkedIDsList1)
     linkedIDs2 = Counter(linkedIDsList2)
     # calculate cosine similarity between two users via retweet
-    numerator = sum([linkedIDs1[linkedID] * linkedIDs2[linkedID] for linkedID in linkedIDs1.keys() if linkedID in linkedIDs2.keys()])
-    denominator = np.sqrt(sum([linkedIDs1[linkedID]**2 for linkedID in linkedIDs1.keys()]) * sum([linkedIDs2[linkedID]**2 for linkedID in linkedIDs2.keys()]))
-    cosineSimilarity = numerator / denominator
-    print("\t Retweet cosine similarity:", cosineSimilarity)
+    # numerator = sum([linkedIDs1[linkedID] * linkedIDs2[linkedID] for linkedID in linkedIDs1.keys() if linkedID in linkedIDs2.keys()])
+    # denominator = np.sqrt(sum([linkedIDs1[linkedID]**2 for linkedID in linkedIDs1.keys()]) * sum([linkedIDs2[linkedID]**2 for linkedID in linkedIDs2.keys()]))
+    # cosineSimilarity = numerator / denominator
+    # print("\t Retweet cosine similarity:", cosineSimilarity)
     urlsLists1 = user1Data[user1Data.tweet_type!="retweet"]["urls"].values
     urlsLists2 = user2Data[user2Data.tweet_type!="retweet"]["urls"].values
 
@@ -160,8 +176,11 @@ def printEdge(edge):
     print("\t\t User 1:", [f"{entry}:{counts}" for entry,counts in urls1.most_common()])
     print("\t\t User 2:", [f"{entry}:{counts}" for entry,counts in urls2.most_common()])
     # two columns for text, one for each user
-    text1 = sorted(user1Data["text"].values)
-    text2 = sorted(user2Data["text"].values)
+    # concatenate text and creation_date as text (creation_date)
+    textDate1 = user1Data["text"] + " (" + user1Data["creation_date"] + ")"
+    textDate2 = user2Data["text"] + " (" + user2Data["creation_date"] + ")"
+    text1 = sorted(textDate1.values)
+    text2 = sorted(textDate2.values)
     print("\t Text: \n\tUser1:")
     for text in text1:
         # print("\t\t", text)
@@ -201,7 +220,11 @@ def printEdge(edge):
 # for edge in topEdges[0:1]:
 #     printEdge(edge)
 
-printEdge(topEdges[1])
+selectedCommunityIndex = 265
+topEdgesFiltered = [edges for edges in topEdges if user2Community[edges[0]] == selectedCommunityIndex and user2Community[edges[1]] == selectedCommunityIndex]
+print("Community filtered edges:")
+print(Counter([edge[3] for edge in topEdgesFiltered]))
+printEdge(topEdgesFiltered[0])
 
 
 # create dictionary of user (user_id) to all retweets as list (linked_tweet) 
