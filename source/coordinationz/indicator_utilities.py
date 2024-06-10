@@ -9,11 +9,14 @@ import ast
 import numpy as np
 from collections import Counter
 
-from . import textsimilarity_helper as ts
 from nltk.corpus import stopwords
 import nltk
 import re
-
+import spacy
+import nltk
+from nltk.corpus import stopwords
+import unalix
+from tqdm.auto import tqdm
 
 def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
     if minUserActivities > 0:
@@ -76,7 +79,7 @@ def obtainBipartiteEdgesURLs(df,removeRetweets=True, removeQuotes=False, removeR
     urls = urls[mask]
     users = users[mask]
     # create edges list users -> urls
-    edges = [(user,url) for user,urlList in zip(users,urls) for url in urlList]
+    edges = [(user,url) for user,urlList in zip(tqdm(users,desc="Cleaning URLs..."),urls) for url in urlList]
     return edges
 
 def obtainBipartiteEdgesHashtags(df,removeRetweets=True,removeQuotes=False,removeReplies=False):
@@ -102,6 +105,61 @@ def obtainBipartiteEdgesHashtags(df,removeRetweets=True,removeQuotes=False,remov
     return edges
   
 
+try:
+    nlp = spacy.load('en_core_web_lg')
+except OSError:
+    from spacy.cli import download
+    download('en_core_web_lg')
+    nlp = spacy.load('en_core_web_lg')
+
+
+def remove_emoji(text):
+    emoji_pattern = re.compile("["
+                           u"\U0001F600-\U0001F64F"  # emoticons
+                           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                           u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                           u"\U0001F700-\U0001F77F"  # alchemical symbols
+                           u"\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
+                           u"\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+                           u"\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+                           u"\U0001FA00-\U0001FA6F"  # Chess Symbols
+                           u"\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+                           u"\U00002702-\U000027B0"
+                           u"\U000024C2-\U0001F251"
+                           "]+", flags=re.UNICODE)
+    return emoji_pattern.sub(r'', text)
+
+
+def tokenizeTweet(text, ngram_range=(1, 2)):
+    # Check if NLTK stopwords are available, if: not download
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        nltk.download('stopwords')
+    
+    # Load English Stop Words
+    stopword_set = set(stopwords.words('english'))
+
+    # Cleaning text
+    text = re.sub(r'https?://\S+|www\.\S+', " ", text)  # Remove URL
+    text = re.sub(r'@\w+', ' ', text)  # Remove mentions
+    text = re.sub(r'\d+', ' ', text)  # Remove digits
+    text = re.sub(r'<.*?>', ' ', text)  # Remove HTML tags
+    text = remove_emoji(text)  # Remove emoji
+    text = re.sub(r'#\w+', ' ', text)  # Remove hashtags
+    text = text.lstrip('RT')  # Remove RT word
+
+    # Use spaCy to tokenize and lemmatize
+    doc = nlp(text)
+    tokens = [token.lemma_ for token in doc if token.lemma_.lower() not in stopword_set and not token.is_punct and not token.is_space]
+    # Include n-grams of size defined by ngram_range
+    ngrams = []
+    for n in range(ngram_range[0], ngram_range[1] + 1):
+        ngrams.extend([" ".join(tokens[i:i+n]).lower() for i in range(len(tokens) - n + 1)])
+    return ngrams
+
+
+
 def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeReplies=False, ngramSize = 1):
     if "text" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
@@ -115,7 +173,14 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
 
     # convert url strings that looks like lists to actual lists
     users = df["user_id"]
-    tokens = df["text"].apply(lambda x: tokenizeTweet(x,ngram_range=(1,ngramSize)))
+    textData = df["text"]
+    if("data_translatedContentText" in df):
+        textData = df["data_translatedContentText"].copy()
+        # for the nans, use the original text
+        mask = textData.isna()
+        textData.loc[mask] = df["text"][mask]
+
+    tokens = df["text"].progress_apply(lambda x: tokenizeTweet(x,ngram_range=(1,ngramSize)))
     # keep only non-empty lists
     mask = tokens.apply(lambda x: len(x) > 0)
     tokens = tokens[mask]
@@ -126,6 +191,7 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
   
 
 def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999):
+    from . import textsimilarity_helper as ts
     embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
     embed_keys, sentence_embeddings = ts.filter_active(df, embed_keys, sentence_embeddings, min_activity=min_activity, column=column)
 
@@ -534,74 +600,5 @@ def suspiciousTables(df,mergedNetwork,
         dfFiltered = df[df["user_id"].isin(uniqueUsers)]
         outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
     return outputs
-
-
-def remove_emoji(string):
-    emoji_pattern = re.compile("["
-                           u"\U0001F600-\U0001F64F"  # emoticons
-                           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-                           u"\U0001F680-\U0001F6FF"  # transport & map symbols
-                           u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                           u"\U00002702-\U000027B0"
-                           u"\U000024C2-\U0001F251"
-                           "]+", flags=re.UNICODE)
-    return emoji_pattern.sub(r'', string)
-
-def tokenizeTweet(text, ngram_range=(1,2)):
-    # check if nltk stopwords are available, if not download
-    try:
-        nltk.data.find('corpora/stopwords')
-    except LookupError:
-        nltk.download('stopwords')
-    #Load English Stop Words
-    stopword = stopwords.words('english')
-    stopword = set(stopword)
-    stopword.add("https")
-    stopword.add("co")
-    # Cleaning tweets in en language
-    # Removing RT Word from Messages
-    text=text.lstrip('RT')
-    text=text.replace( ":",' ')
-    text=text.replace( ";",' ')
-    text=text.replace( ".",' ')
-    text=text.replace( ",",' ')
-    text=text.replace( "!",' ')
-    text=text.replace( "&",' ')
-    text=text.replace( "-",' ')
-    text=text.replace( "_",' ')
-    text=text.replace( "$",' ')
-    text=text.replace( "/",' ')
-    text=text.replace( "?",' ')
-    text=text.replace( "''",' ')
-    text=text.lower()
-    #Remove URL
-    text = re.sub(r'https?://\S+|www\.\S+', " ", text)
-    #Remove Mentions
-    text = re.sub(r'@\w+',' ',text)
-    #Remove Digits
-    text = re.sub(r'\d+', ' ', text)
-    #Remove HTML tags
-    text = re.sub('r<.*?>',' ', text)
-    #Remove HTML tags
-    text = re.sub('r<.*?>',' ', text)
-    #Remove Emoji from text
-    text = remove_emoji(text)
-    #Remove hashtags
-    text = re.sub(r'#\w+', ' ', text)
-    #Remove Punctuation
-    text = re.sub(r'[^\w\s]', ' ', text)
-    #Remove Extra Spaces
-    text = re.sub(r'\s+', ' ', text)
-    # remove stopwords
-    text = ' '.join([word for word in text.split() if word not in stopword])
-    # tokenize
-    tokens = text.split()
-    # also include n-grams of size defined by ngram_range
-    ngrams = []
-    for n in range(ngram_range[0],ngram_range[1]+1):
-        ngrams.extend([" ".join(tokens[i:i+n]) for i in range(len(tokens)-n+1)])
-    return ngrams
-
-
 
 

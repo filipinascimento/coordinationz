@@ -1,7 +1,26 @@
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
 import numpy as np
-from pynndescent import NNDescent
+
+
+try:
+    from sentence_transformers import SentenceTransformer
+except:
+    # raise new exception instructing user to install sentence_transformers
+    message = "Please install the sentence_transformers package"
+    message+= " by running the following command:\n\n"
+    message+= "pip install sentence-transformers"
+    raise ImportError(message)
+
+try:
+    from pynndescent import NNDescent
+except:
+    # raise new exception instructing user to install sentence_transformers
+    message = "Please install the pynndescent package"
+    message+= " by running the following command:\n\n"
+    message+= "pip install pynndescent"
+    raise ImportError(message)
+
+
 
 def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None):
     if cache_path is not None: 
@@ -18,6 +37,7 @@ def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-
             sentence_embeddings = cache["embeddings"]
 
             return embed_keys, sentence_embeddings
+
 
     tweets = df[column].unique()
 

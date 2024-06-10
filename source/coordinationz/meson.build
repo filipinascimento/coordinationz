@@ -11,6 +11,7 @@ py_sources = files(
     'cohashtag_helper.py',
     'visualization.py',
     'textsimilarity_helper.py',
+    'usc_text_similarity.py',
 )
 
 
