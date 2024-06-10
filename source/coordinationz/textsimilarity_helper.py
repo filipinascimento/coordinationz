@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
-
+import emoji
+import re
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -21,6 +22,18 @@ except:
     raise ImportError(message)
 
 
+def preprocess_tweet(tweet):
+    # replace any special symbols
+    tweet = re.sub(r"\U00002026", "...", str(tweet))
+    tweet = re.sub(r"\S*https?:\S*", "HTTPSURL", tweet)
+    tweet = emoji.demojize(tweet)
+
+    # remove all newlines
+    lines = map(lambda line: line.strip(), tweet.splitlines())
+    lines = (line if re.match(r"[.?!]$", line) else line + "." for line in lines if line)
+    tweet = " ".join(lines)
+
+    return tweet
 
 def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None):
     if cache_path is not None: 
@@ -39,17 +52,16 @@ def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-
             return embed_keys, sentence_embeddings
 
 
-    tweets = df[column].unique()
+    tweets = df[column].unique().tolist()
+    processed = list(map(preprocess_tweet, tweets))
 
     model = SentenceTransformer(model, device="cuda")
-    sentence_embeddings = model.encode(tweets, show_progress_bar=True)
-
-    embed_keys = tweets.tolist()
+    sentence_embeddings = model.encode(processed, show_progress_bar=True)
     
     if cache_path is not None:
-        np.savez_compressed(cache_path, keys=embed_keys, embeddings=sentence_embeddings)
+        np.savez_compressed(cache_path, keys=tweets, embeddings=sentence_embeddings)
 
-    return embed_keys, sentence_embeddings
+    return tweets, sentence_embeddings
 
 def filter_active(df, embed_keys, sentence_embeddings, min_activity=10, column="text"):
     df = df[df["tweet_type"] != "retweet"]
