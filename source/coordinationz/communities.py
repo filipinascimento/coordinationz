@@ -35,7 +35,10 @@ def getNetworksWithCommunities(g,
         for c in allCommunities:
             edgesInCommunity = gThresholded.es.select(_source_in=gThresholded.vs.select(CommunityIndex_eq=c),_target_in=gThresholded.vs.select(CommunityIndex_eq=c))
             community2EdgesCount[c] = len(gThresholded.es.select(_source_in=gThresholded.vs.select(CommunityIndex_eq=c)))
-            community2EdgesDensity[c] = community2EdgesCount[c]/(community2Size[c]*(community2Size[c]-1))
+            if(community2Size[c]>1):
+                community2EdgesDensity[c] = community2EdgesCount[c]/(community2Size[c]*(community2Size[c]-1))
+            else:
+                community2EdgesDensity[c] = 0
             community2EdgesAvgWeight[c] = np.mean(edgesInCommunity[thresholdAttribute])
         gThresholded.vs["CommunitySize"] = [community2Size[c] for c in gThresholded.vs["CommunityIndex"]]
         gThresholded.vs["CommunityEdgesCount"] = [community2EdgesCount[c] for c in gThresholded.vs["CommunityIndex"]]
@@ -56,3 +59,11 @@ def getNetworksWithCommunities(g,
             
         networks[f"{threshold}"] = gThresholded
     return networks
+
+
+
+
+
+
+
+
