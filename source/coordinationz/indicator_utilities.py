@@ -28,7 +28,8 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         elif("hashtag" in activityType.lower()):
             # len(hashtags) should be >0
-            userActivityCount = df[df["hashtags"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
+            # should have at least 2 hashtags in the considered tweets.
+            userActivityCount = df[df["hashtags"].apply(lambda x: len(x) > 1)]["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         elif("url" in activityType.lower()):
             # len(urls) should be >0

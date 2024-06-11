@@ -133,7 +133,7 @@ if __name__ == "__main__": # Needed for parallel processing
         print(f"Creating the {networkName} network...")
 
         dfFiltered = czind.filterUsersByMinActivities(df,activityType=networkName, **runParameters["user"][networkName])
-
+        
         if(networkName=="usctextsimilarity"):
             import coordinationz.usc_text_similarity as cztext
             g = cztext.text_similarity(dfFiltered)
