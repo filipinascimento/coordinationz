@@ -89,6 +89,8 @@ network = g.to_networkx()
 
 The config file used to generate the data will be copied to the "CONFIG" directory. A new section will be added to the config with extra parameters about the run.
 
+## Text similarity indicators
+The text similarity indicators can be run by including `usctextsimilarity`, `textsimilarity` or `coword` to the indicator list. For instance `pipeline/indicators.py <data_name> -i cohashtag coretweet courl textsimilarity. `usctextsimilarity` and textsimilarity requires the instalation of packages faiss and sentence-transformers. GPU is recommended for performance.
 
 ## Run for IO datasets
 Repeat the same steps as for INCAS datasets, but set the `IO_DATASETS` variable in the config.toml file to the location of the IO datasets. Also, for preprocessing, use the `pipeline/preprocess/preprocessIO.py` script.

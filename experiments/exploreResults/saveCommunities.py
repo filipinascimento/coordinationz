@@ -19,6 +19,8 @@ from collections import Counter
 # import partial
 from functools import partial
 import matplotlib.pyplot as plt
+import csv
+
 
 dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
 configPath = None
@@ -35,41 +37,13 @@ else:
     print("Loading config from default location...")
     # print("------")
 
+df = czpre.loadPreprocessedData(dataName, config=config)
 
-def filterNgramParts(tokens,maxTokens=6):
-    # suppose it receives a list of tokens that can be ngrams
-    # ngrams are separated by space
-    # from the first to the last, if the ngram parts are repeated, remove them
-    # will return at most 6 valid tokens
-    prohibitedTokens = set()
-    filteredTokens = []
-    for token in tokens:
-        if token in prohibitedTokens:
-            continue
-        tokenParts = token.split()
-        for i in range(0,len(tokenParts)):
-            prohibitedTokens.add(tokenParts[i])
-        # also add all the possible ngrams
-        for i in range(2,len(tokenParts)+1):
-            for j in range(0,len(tokenParts)-i+1):
-                prohibitedTokens.add(" ".join(tokenParts[j:j+i]))
-        filteredTokens.append(token)
-        # print(prohibitedTokens)
-        if(len(filteredTokens) == maxTokens):
-            break
-    return filteredTokens
 
 networksPath = Path(config["paths"]["NETWORKS"]).resolve()
 tablesOutputPath = Path(config["paths"]["TABLES"]).resolve()
 figuresOutputPath = Path(config["paths"]["FIGURES"]).resolve()
 
-df = czpre.loadPreprocessedData(dataName, config=config)
-df["contentText"] = df["text"]
-if("data_translatedContentText" in df):
-    df["contentText"] = df["data_translatedContentText"]
-    # for the nans, use the original text
-    mask = df["text"].isna()
-    df.loc[mask,"contentText"] = df["text"][mask]
 
 typeToSuffix = {
     ("merged","all"),
@@ -84,29 +58,20 @@ typeToSuffix = {
 }
 
 
-preprocessPath = Path(config["paths"]["PREPROCESSED_DATASETS"])
-onlyInSynthPath = preprocessPath/f"{dataName}_onlyInSynth.pkl"
-if(onlyInSynthPath.exists()):
-    with open(onlyInSynthPath, "rb") as f:
-        onlyInSynth = pickle.load(f)
-        newUsersInSynth = onlyInSynth["newUsers"]
-        usersWithNewTweetsInSynth = onlyInSynth["usersWithNewTweets"]
-else:
-    newUsersInSynth = set()
-    usersWithNewTweetsInSynth = set()
+for networkType,suffix in tqdm(typeToSuffix):
+        for threshold in [0.9999,0.99999]:
+            thresholdAttribute = "quantile"
+            thresholdedNetworkPath = networksPath/f"{dataName}_{suffix}_{networkType}_thres_{thresholdAttribute}_{threshold}.xnet"
+            g = xn.load(thresholdedNetworkPath)
+
+            tables = czind.suspiciousTables(df,g,
+                                            thresholdAttribute = "quantile",
+                                            thresholds = [0])
 
 
-tweetID2Tokens = {}
-def getTokens(tweetID,text):
-    if(tweetID in tweetID2Tokens):
-        return tweetID2Tokens[tweetID]
-    tokens = czind.tokenizeTweet(text,ngram_range=(1,3))
-    tweetID2Tokens[tweetID] = tokens
-    return tokens
+            tableData = tables["0"]
+            dfEdges = tableData["edges"]
+            dfFiltered = tableData["filtered"]
+            dfFiltered.to_csv(tablesOutputPath/f"{dataName}_{suffix}_{networkType}_filtered_{threshold}.csv",index=False,quoting=csv.QUOTE_NONNUMERIC,escapechar="\\")
+            dfEdges.to_csv(tablesOutputPath/f"{dataName}_{suffix}_{networkType}_edges_{threshold}.csv",index=False,quoting=csv.QUOTE_NONNUMERIC,escapechar="\\")
 
-
-
-
-for networkType,suffix in typeToSuffix.items():
-    networkPath = networksPath/f"{dataName}_{suffix}_{networkType}.xnet"
-    g = xn.load(networkPath)

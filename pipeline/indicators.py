@@ -10,6 +10,7 @@ import coordinationz.experiment_utilities as czexp
 import coordinationz.preprocess_utilities as czpre
 import coordinationz.indicator_utilities as czind
 import coordinationz.network as cznet
+import coordinationz.communities as czcom
 import sys
 import argparse
 import shutil
@@ -175,16 +176,26 @@ if __name__ == "__main__": # Needed for parallel processing
         g = cznet.removeSingletons(g)
         xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
         generatedNetworks[networkName] = g
+        
+        gCommunities = czcom.getNetworksWithCommunities(g) #**runParameters["communities"][networkName]
+        for threshold, gThresholded in gCommunities.items():
+            xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_{networkName}_community_{threshold}.xnet")
     
     print(f"Merging networks...")
     mergingMethod = runParameters["merging"]["method"]
     del runParameters["merging"]["method"]
     mergedNetwork = czind.mergeNetworks(generatedNetworks,
                                         **runParameters["merging"])
-
+    
     xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged.xnet")
 
 
+
+    gCommunities = czcom.getNetworksWithCommunities(mergedNetwork,**runParameters["output"]) #**runParameters["communities"][networkName]
+    for threshold, gThresholded in gCommunities.items():
+        xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_merged_community_{threshold}.xnet")
+
+    
     print(f"Saving data...")
     incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
                                                  **runParameters["output"])
