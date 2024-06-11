@@ -174,7 +174,7 @@ def estimateIDFWeightsShuffled(bipartiteIndexedEdges, leftCount, rightCount, idf
 
 def bipartiteNullModelSimilarity(
         bipartiteEdges,
-        scoreType=["zscore","pvalue-quantized"], # "zscore", "pvalue" | "pvalue-quantized", "onlynullmodel", "quantile" are valid
+        scoreType=["zscore","pvalue-quantized"], # "zscore", "pvalue" | "pvalue-quantized", "onlynullmodel", "quantile", "quantilesimilarity" are valid
         pvaluesQuantized = None, # can be a number or a list of pvalues, defaults to 2*orders of magnitude(realizations)
         fisherTransform = False,
         realizations = 10000,
@@ -196,9 +196,9 @@ def bipartiteNullModelSimilarity(
     ----------
     bipartiteEdges: np.ndarray
         The indexed edges of the bipartite graph
-    scoreType: string or list containing "pvalue", "pvalue-quantized", "zscore", "quantile" or "onlynullmodel"
+    scoreType: string or list containing "pvalue", "pvalue-quantized", "zscore", "quantile", "quantilesimilarity" or "onlynullmodel"
         The type of score to calculate, can be "pvalue", "pvalue-quantized", "zscore",
-        "quantile", or "onlynullmodel",
+        "quantile","quantilesimilarity", or "onlynullmodel",
         if "onlynullmodel" is selected, then the function will only return the
         degree similarities.
         if "quantile" is used, then it will return the quantile of the similarity across all possible links
@@ -525,6 +525,13 @@ def bipartiteNullModelSimilarity(
             rank = rankdata(resultSimilarities, method="max")
             returnValues["quantiles"] = (pairsCount-len(rank)+rank)/pairsCount
 
+        if("quantilesimilarity" in scoreTypes):
+            # will calculate the quantiles, i.e., how many similarities are above each similarity value
+            # (for each pair in resultSimilarities)
+            pairsCount = leftCount*(leftCount-1)//2
+            rank = rankdata(resultSimilarities, method="max")
+            returnValues["quantilesimilarities"] = ((pairsCount-len(rank)+rank)/pairsCount)*resultSimilarities
+
             # print(f"LeftCount: {pairsCount} len(resultSimilarities): {len(resultSimilarities)}")
         if(returnDegreeValues):
             returnValues["degrees"] = leftDegrees
@@ -619,6 +626,14 @@ def bipartiteNullModelSimilarity(
         pairsCount = leftCount*(leftCount-1)//2
         rank = rankdata(resultSimilarities, method="max")
         returnValues["quantiles"] = (pairsCount-len(rank)+rank)/pairsCount
+
+    if("quantilesimilarity" in scoreTypes):
+        # will calculate the quantiles, i.e., how many similarities are above each similarity value
+        # (for each pair in resultSimilarities)
+        pairsCount = leftCount*(leftCount-1)//2
+        rank = rankdata(resultSimilarities, method="max")
+        returnValues["quantilesimilarities"] = ((pairsCount-len(rank)+rank)/pairsCount)*resultSimilarities
+
 
     if(shouldCalculatePvalues or shouldCalculatePvaluesQuantized):
         returnValues["pvalues"] = resultPValues

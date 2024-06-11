@@ -572,32 +572,69 @@ def suspiciousTables(df,mergedNetwork,
     outputs = {}
     for threshold in thresholds:
         edgesData = []
-        labels = mergedNetwork.vs["Label"]
-        if "similarity" in mergedNetwork.es.attributes():
-            similarities = mergedNetwork.es["similarity"]
+        gFiltered = mergedNetwork.copy()
+        # filter edges removing thresholdAttribute
+        if(thresholdAttribute=="pvalue"):
+            gFiltered.delete_edges(gFiltered.es.select(pvalue_gt=threshold))
         else:
-            similarities = mergedNetwork.es["weight"]
-        if "Type" in mergedNetwork.es.attributes():
-            edgeTypes = mergedNetwork.es["Type"]
+            mask = np.array(gFiltered.es[thresholdAttribute]) < threshold
+            gFiltered.delete_edges(np.where(mask)[0])
+
+        # remove singletons
+        gFiltered.delete_vertices(gFiltered.vs.select(_degree=0))
+
+        labels = gFiltered.vs["Label"]
+        if "similarity" in gFiltered.es.attributes():
+            similarities = gFiltered.es["similarity"]
+        else:
+            similarities = gFiltered.es["weight"]
+        if "Type" in gFiltered.es.attributes():
+            edgeTypes = gFiltered.es["Type"]
         else:
             edgeTypes = ["NA"] * len(similarities)
-        quantiles = mergedNetwork.es[thresholdAttribute]
-        edgeList = mergedNetwork.get_edgelist()
+        
+        communities = ["NA"]*len(labels)
+        if("CommunityLabel" in gFiltered.vs.attributes()):
+            communities = gFiltered.vs["CommunityLabel"]
+            user2Community = {label:community for label,community in zip(labels,communities)}
+
+        extraFields = ["NA"]*len(labels)
+        if("ExtraField" in gFiltered.vs.attributes()):
+            extraFields = gFiltered.vs["ExtraField"]
+            user2ExtraField = {label:extraField for label,extraField in zip(labels,extraFields)}
+        
+        nodeStrengths = gFiltered.strength(weights=similarities)
+        nodeDegrees = gFiltered.degree()
+        user2Strength = {label:strength for label,strength in zip(labels,nodeStrengths)}
+        user2Degree = {label:degree for label,degree in zip(labels,nodeDegrees)}
+
+        communitySizes = Counter(communities)
+
+        quantiles = gFiltered.es[thresholdAttribute]
+        edgeList = gFiltered.get_edgelist()
         # sort edgeList and quantiles by quantiles
         edgeList,quantiles,similarities,edgeTypes = zip(*sorted(zip(edgeList,quantiles,similarities,edgeTypes), key=lambda x: x[1], reverse=True))
         
         for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
             fromLabel = labels[fromIndex]
             toLabel = labels[toIndex]
-            if(thresholdAttribute=="pvalue"):
-                if quantiles[edgeIndex] < threshold:
-                    edgesData.append((fromLabel, toLabel,quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex]))
-            else:
-                if quantiles[edgeIndex] > threshold:
-                    edgesData.append((fromLabel, toLabel,quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex]))
+            fromCommunity = communities[fromIndex]
+            toCommunity = communities[toIndex]
+            edgesData.append((fromLabel, toLabel, 
+                              quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex],
+                              fromCommunity,toCommunity))
         uniqueUsers = set([user for edge in edgesData for user in edge[:2]])
-        dfEdges = pd.DataFrame(edgesData, columns=["From","To","Quantile","Similarity","Type"])
-        dfFiltered = df[df["user_id"].isin(uniqueUsers)]
+        dfEdges = pd.DataFrame(edgesData, columns=["From","To",thresholdAttribute,"Similarity","Type","fromCommunity","toCommunity"])
+        dfFiltered = df[df["user_id"].isin(uniqueUsers)].copy()
+        
+        dfFiltered["Community"] = dfFiltered["user_id"].apply(lambda x: user2Community.get(x,"NA"))
+        dfFiltered["CommunitySize"] = dfFiltered["Community"].apply(lambda x: communitySizes.get(x,0))
+        dfFiltered["ExtraField"] = dfFiltered["user_id"].apply(lambda x: user2ExtraField.get(x,"NA"))
+        dfFiltered["Strength"] = dfFiltered["user_id"].apply(lambda x: user2Strength.get(x,0))
+        dfFiltered["Degree"] = dfFiltered["user_id"].apply(lambda x: user2Degree.get(x,0))
+        # sort entries by strength and then user_id
+        dfFiltered = dfFiltered.sort_values(by=["Strength","user_id"],ascending=[False,True])
+
         outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
     return outputs
 
