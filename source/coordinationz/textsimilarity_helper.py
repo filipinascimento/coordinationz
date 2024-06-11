@@ -23,9 +23,11 @@ except:
 
 
 def preprocess_tweet(tweet):
-    # replace any special symbols
+    # replace any special tokens
+    # based on bertweet normalizer
     tweet = re.sub(r"\U00002026", "...", str(tweet))
     tweet = re.sub(r"\S*https?:\S*", "HTTPSURL", tweet)
+    tweet = re.sub(r"\S*@\S*", "@USER", tweet)
     tweet = emoji.demojize(tweet)
 
     # remove all newlines
