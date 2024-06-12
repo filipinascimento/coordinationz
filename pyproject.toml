@@ -34,7 +34,8 @@ dependencies = [
   "python-igraph",
   "xnetwork",
   "nltk",
-  "unalix"
+  "unalix",
+  "emoji"
 ]
 
 
