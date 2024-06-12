@@ -51,22 +51,22 @@ minUserActivities = 10
 
 # Thresholds for all the indicators
 [indicator.coretweet.thresholds]
-similarity = 0.6
+weight = 0.6
 quantile = 0.99
 [indicator.cohashtag.thresholds]
-similarity = 0.6
+weight = 0.6
 quantile = 0.99
 [indicator.courl.thresholds]
-similarity = 0.6
+weight = 0.6
 quantile = 0.99
 [indicator.coword.thresholds]
-similarity = 0.6
+weight = 0.6
 quantile = 0.99
 [indicator.textsimilarity.thresholds]
-similarity = 0.6
+weight = 0.6
 quantile = 0.99
 [indicator.usctextsimilarity.thresholds]
-similarity = 0.6
+weight = 0.6
 quantile = 0.99
 # example to also include a threshold on similarity
 # similarity = 0.5
