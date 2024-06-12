@@ -15,7 +15,7 @@ import sys
 import argparse
 import shutil
 import json
-
+import pickle
 
 
 # sampled_twitter_en_tl_global_0908
@@ -29,7 +29,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
     dataName = "sampled_20240226"
     indicators = ["coretweet","cohashtag","courl","coretweetusers"]
-
+    tweetIDTextCache = {}
     dataNameHelp = """Name of the dataset. A file named <dataName>.csv should be in the preprocessed datasets folder.
     if a dataName has a .csv extension, it will copy that file to the preprocessed datasets folder and use it."""
     parser = argparse.ArgumentParser()
@@ -99,6 +99,15 @@ if __name__ == "__main__": # Needed for parallel processing
     tablesPath = Path(config["paths"]["TABLES"]).resolve()
     tablesPath.mkdir(parents=True, exist_ok=True)
 
+
+    preprocessPath = Path(config["paths"]["PREPROCESSED_DATASETS"])
+    extraPropertiesPath = preprocessPath/f"{dataName}_extraData.pkl"
+    if(extraPropertiesPath.exists()):
+        with open(extraPropertiesPath, "rb") as f:
+            extraProperties = pickle.load(f)
+    else:
+        extraProperties = {}
+    
     def text_similarity_partial(df):
         if "textsimilarity" in config["indicator"]:
             parameters = config["indicator"]["textsimilarity"]
@@ -174,41 +183,63 @@ if __name__ == "__main__": # Needed for parallel processing
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
         g = cznet.removeSingletons(g)
-        xn.save(g, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
-        generatedNetworks[networkName] = g
+
+        gThresholded = cznet.thresholdNetwork(g, **runParameters["threshold"][networkName])
+
+        if(extraProperties):
+            for key in extraProperties:
+                gThresholded.vs[key] = [extraProperties[key].get(user,"None") for user in gThresholded.vs["Label"]]
+
+        xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
+        generatedNetworks[networkName] = gThresholded
         
-        gCommunities = czcom.getNetworksWithCommunities(g) #**runParameters["communities"][networkName]
-        for threshold, gThresholded in gCommunities.items():
-            xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_{networkName}_community_{threshold}.xnet")
+        if("community" in runParameters and runParameters["community"]["detectCommunity"]):
+            print(f"Finding communities in the {networkName} network...")
+            gCommunities = czcom.getNetworksWithCommunities(gThresholded.copy()) #**runParameters["communities"][networkName]
+            if(runParameters["community"]["computeCommunityLabels"]):
+                print(f"Computing community labels for the {networkName} network...")
+                gCommunities = czcom.labelCommunities(df,gCommunities,tweetIDTextCache)
+            xn.save(gCommunities, networksPath/f"{dataName}_{suffix}_{networkName}_community.xnet")
     
     print(f"Merging networks...")
-    mergingMethod = runParameters["merging"]["method"]
-    del runParameters["merging"]["method"]
+    # mergingMethod = runParameters["merging"]["method"]
+    # del runParameters["merging"]["method"]
     mergedNetwork = czind.mergeNetworks(generatedNetworks,
                                         **runParameters["merging"])
     
-    xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged.xnet")
 
+    thresholdAttribute = runParameters["output"]["thresholdAttribute"]
+    for threshold in runParameters["output"]["thresholds"]:
+        thresholdOptions = {}
+        thresholdOptions[thresholdAttribute] = threshold
 
+        mergedNetwork = cznet.thresholdNetwork(mergedNetwork,thresholdOptions)
+        
+        if("community" in runParameters and runParameters["community"]["detectCommunity"]):
+            print(f"Finding communities in the merged network...")
+            mergedNetwork = czcom.getNetworksWithCommunities(mergedNetwork.copy()) #**runParameters["communities"][networkName]
+            if(runParameters["community"]["computeCommunityLabels"]):
+                print(f"Computing community labels for the merged network...")
+                mergedNetwork = czcom.labelCommunities(df,mergedNetwork,tweetIDTextCache)
+        
+        if("extraThresholds" in runParameters["output"] and runParameters["output"]["extraThresholds"]):
+            mergedNetwork = cznet.thresholdNetwork(mergedNetwork,runParameters["output"]["extraThresholds"])
+        
+        xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged_{threshold}.xnet")
 
-    gCommunities = czcom.getNetworksWithCommunities(mergedNetwork,**runParameters["output"]) #**runParameters["communities"][networkName]
-    for threshold, gThresholded in gCommunities.items():
-        xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_merged_community_{threshold}.xnet")
-
-    
-    print(f"Saving data...")
-    incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
-                                                 **runParameters["output"])
-    
-    # suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
-    # suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)
-    # suspiciousEdgesData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges.csv",index=False)
-    # suspiciousClustersData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_clusters.csv")
-    # save incasOutput to a json file
-    for threshold,outputData in incasOutput.items():
+        
+        print(f"Saving data...")
+        incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
+                                                    rankingAttribute = thresholdAttribute)
+        
+        # suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
+        # suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)
+        # suspiciousEdgesData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges.csv",index=False)
+        # suspiciousClustersData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_clusters.csv")
+        # save incasOutput to a json file
         with open(tablesPath/f"{dataName}_{suffix}_segments_{threshold}.json", "w") as f:
-            json.dump(outputData, f)
-    
+            json.dump(incasOutput, f)
+        
     config["run"]= {
         "dataName":dataName,
         "suffix":suffix,
