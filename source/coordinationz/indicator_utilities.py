@@ -7,13 +7,12 @@ import igraph as ig
 # ast evaluates strings that are python expressions
 import ast
 import numpy as np
-from collections import Counter
+from collections import Counter, defaultdict
 
 from nltk.corpus import stopwords
 import nltk
 import re
 import spacy
-import nltk
 from nltk.corpus import stopwords
 import unalix
 from tqdm.auto import tqdm
@@ -566,7 +565,25 @@ def mergedSuspiciousEdges(mergedNetwork):
     # dfEdges.to_csv(networksPath/f"{dataName}_{networkParameters}_merged_edges.csv",index=False)
     return dfEdges
 
+def rankCommunities(gThresholded, strategy="mean", weightAttribute="weight"):
+    communities = defaultdict(list)
+    for v, index in enumerate(gThresholded.vs["CommunityIndex"]):
+        communities[index].append(v)
 
+    communities = list(map(gThresholded.subgraph, map(gThresholded.vs.select, communities.values())))
+    
+    if strategy == "mean":
+        ranking = lambda c: c.vs[0]["CommunityEdgesAvg_" + weightAttribute]
+    elif strategy == "sumsqrt":
+        ranking = lambda c: c.vs[0]["CommunityEdgesAvg_" + weightAttribute] * np.sqrt(c.vs[0]["CommunityEdgesCount"])
+    elif strategy == "max":    
+        ranking = lambda c: max(c.es[weightAttribute])
+    else:
+        raise ValueError(f"Invalid strategy \"{strategy}\"")
+
+    communities.sort(key=ranking, reverse=True)
+
+    return communities
 
 def generateEdgesINCASOutput(mergedNetwork, allUsers,
                              rankingAttribute = "quantile"):
