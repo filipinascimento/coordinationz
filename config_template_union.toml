@@ -49,9 +49,25 @@ minItemStrength = 1
 minUserActivities = 10
 
 
-# This threshold is applied before the merged networks.
-[indicator.thresholds]
-quantile = 0.0
+# Thresholds for all the indicators
+[indicator.coretweet.thresholds]
+similarity = 0.6
+quantile = 0.99
+[indicator.cohashtag.thresholds]
+similarity = 0.6
+quantile = 0.99
+[indicator.courl.thresholds]
+similarity = 0.6
+quantile = 0.99
+[indicator.coword.thresholds]
+similarity = 0.6
+quantile = 0.99
+[indicator.textsimilarity.thresholds]
+similarity = 0.6
+quantile = 0.99
+[indicator.usctextsimilarity.thresholds]
+similarity = 0.6
+quantile = 0.99
 # example to also include a threshold on similarity
 # similarity = 0.5
 
@@ -74,8 +90,8 @@ cache_path = "Data/Cache"
 
 ["merging"] 
 #method used for merging the networks. Only pvalue or quantile are available for now
-method = "quantile"
-weightAttribute = "quantile" # Attribute to be used as weight for the merging
+method = "max"
+weightAttribute = "similarity" # Attribute to be used as weight for the merging
 shouldAggregate = true
 
 ["community"]
@@ -83,8 +99,8 @@ detectCommunity = true
 computeCommunityLabels = false
 
 ["output"]
-thresholdAttribute = "quantile"
-thresholds = [0.95,0.99,0.999,0.9999,0.99999]
+thresholdAttribute = "similarity"
+thresholds = [0]
 
 # Specific extra thresholds for the output
 # based on other features

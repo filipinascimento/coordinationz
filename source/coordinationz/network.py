@@ -151,3 +151,37 @@ def removeSingletons(g):
     gCopy = g.copy()
     gCopy.delete_vertices(gCopy.vs.select(_degree = 0))
     return gCopy
+
+def thresholdNetwork(g,thresholds):
+    """
+    Thresholds a network based on an attribute
+
+    Parameters:
+    -----------
+    g: igraph.Graph
+        The graph to threshold
+    threshold: dict
+        A dictionary with the threshold attribute and the threshold value
+
+    Returns:
+    --------
+    igraph.Graph
+        The thresholded graph
+    """
+
+    gThresholded = g.copy()
+    mask = np.ones(gThresholded.ecount(),dtype=bool)
+    for thresholdAttribute, threshold in thresholds.items():
+        if(thresholdAttribute not in set(gThresholded.es.attributes())):
+            print(f"Attribute {thresholdAttribute} not found in the graph")
+            continue
+        if(thresholdAttribute=="pvalue"):
+            attributeArray = np.array(gThresholded.es["pvalue"])
+            mask &= attributeArray < threshold
+        else:
+            attributeArray = np.array(gThresholded.es[thresholdAttribute])
+            mask &= attributeArray > threshold
+    gThresholded.delete_edges(np.where(mask == False)[0])
+    # remove degree 0 nodes
+    gThresholded.delete_vertices(gThresholded.vs.select(_degree=0))
+    return gThresholded
