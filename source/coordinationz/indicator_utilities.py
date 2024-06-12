@@ -28,7 +28,8 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         elif("hashtag" in activityType.lower()):
             # len(hashtags) should be >0
-            userActivityCount = df[df["hashtags"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
+            # should have at least 2 hashtags in the considered tweets.
+            userActivityCount = df[df["hashtags"].apply(lambda x: len(x) > 1)]["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         elif("url" in activityType.lower()):
             # len(urls) should be >0
@@ -246,6 +247,10 @@ def parseParameters(config,indicators):
     if "merging" in config:
         mergingConfig = config["merging"]
     
+    communitiesConfig = {}
+    if "community" in config:
+        communitiesConfig = config["community"]
+
     outputConfig = {}
     if "output" in config:
         outputConfig = config["output"]
@@ -269,6 +274,27 @@ def parseParameters(config,indicators):
                 if key in indicatorConfig[indicator]:
                     specificConfig[param] = indicatorConfig[indicator][key]
         specificUserFilterOptions[indicator] = {**generalUserFilterOptions, **specificConfig}
+
+    thresholdParametersMap = {
+        "thresholds": ("thresholds",{}),
+    }
+
+    generalThresholdOptions = {}
+    for key, (param, default) in thresholdParametersMap.items():
+        if key in indicatorConfig:
+            generalThresholdOptions[param] = indicatorConfig[key]
+        else:
+            generalThresholdOptions[param] = default
+    
+    specificThresholdOptions = {}
+    for indicator in indicators:
+        specificConfig = {}
+        if indicator in indicatorConfig:
+            for key, (param, default) in thresholdParametersMap.items():
+                if key in indicatorConfig[indicator]:
+                    specificConfig[param] = indicatorConfig[indicator][key]
+        specificThresholdOptions[indicator] = {**generalThresholdOptions, **specificConfig}
+    
 
     # name to (key, default value)
     nodeFilterParametersMap = {
@@ -367,11 +393,25 @@ def parseParameters(config,indicators):
         else:
             generalMergingOptions[param] = default
     
+
+    thresholdParametersMap = {
+        "detectCommunity": ("detectCommunity",True),
+        "computeCommunityLabels": ("computeCommunityLabels",False),
+    }
+    
+    generalCommunitiesOptions = {}
+    for key, (param, default) in thresholdParametersMap.items():
+        if key in communitiesConfig:
+            generalCommunitiesOptions[param] = communitiesConfig[key]
+        else:
+            generalCommunitiesOptions[param] = default
+
     # thresholdAttribute = "quantile"
     # thresholds = [0.95,0.99]
     outputOptions = {
         "thresholdAttribute": ("thresholdAttribute","quantile"),
         "thresholds": ("thresholds",[0.95,0.99]),
+        "extraThresholds": ("extraThresholds",{}),
     }
 
     generalOutputOptions = {}
@@ -384,9 +424,11 @@ def parseParameters(config,indicators):
     returnValue = {}
     returnValue["user"] = specificUserFilterOptions
     returnValue["filter"] = specificFilterOptions
+    returnValue["threshold"] = specificThresholdOptions
     returnValue["network"] = specificNetworkOptions
     returnValue["nullmodel"] = specificNullModelOptions
     returnValue["merging"] = generalMergingOptions
+    returnValue["community"] = generalCommunitiesOptions
     returnValue["output"] = generalOutputOptions
     return returnValue
 
@@ -400,6 +442,7 @@ def timestamp():
 
 def mergeNetworks(networksDictionary,
                   shouldAggregate = True,
+                  method = "quantile",
                   weightAttribute="similarity",
                   quantileThreshold=0.0,
                   pvalueThreshold=1.0,
@@ -412,7 +455,11 @@ def mergeNetworks(networksDictionary,
     edges = []
     edgeType = []
     edgeAttributes = {}
-
+    combineMethod = "mean"
+    combineMethodProbabilistic = "product"
+    if(method == "max"):
+        combineMethod = "max"
+        combineMethodProbabilistic = "max"
     for networkType, network in networksDictionary.items():
         # if network is empty continue
         if len(network.vs) == 0:
@@ -457,18 +504,18 @@ def mergeNetworks(networksDictionary,
     if(shouldAggregate):
         combineEdges = {}
         if("similarity" in mergedNetwork.es.attributes()):
-            combineEdges["similarity"] = "mean"
+            combineEdges["similarity"] = combineMethod
         if("zscore" in mergedNetwork.es.attributes()):
-            combineEdges["zscore"] = "mean"
+            combineEdges["zscore"] = combineMethod
         if("pvalue" in mergedNetwork.es.attributes()):
             # use product of (1-pvalue)
             pvalueTransformed = 1-np.array(mergedNetwork.es["pvalue"])
             mergedNetwork.es["1-pvalue"] = pvalueTransformed
-            combineEdges["1-pvalue"] = "product"
+            combineEdges["1-pvalue"] = combineMethodProbabilistic
         if("quantile" in mergedNetwork.es.attributes()):
             quantileTransformed = 1-np.array(mergedNetwork.es["quantile"])
             mergedNetwork.es["1-quantile"] = quantileTransformed
-            combineEdges["1-quantile"] = "product"
+            combineEdges["1-quantile"] = combineMethodProbabilistic
         # type concatenate
         # sort and concatenate
         combineEdges["Type"] = lambda x: "-".join(sorted(x))
@@ -522,46 +569,39 @@ def mergedSuspiciousEdges(mergedNetwork):
 
 
 def generateEdgesINCASOutput(mergedNetwork, allUsers,
-                             thresholdAttribute = "quantile",
-                             thresholds = [0.95,0.99]):
-    outputs = {}
-    for threshold in thresholds:
-        edgesData = []
-        labels = mergedNetwork.vs["Label"]
-        quantiles = mergedNetwork.es[thresholdAttribute]
-        edgeList = mergedNetwork.get_edgelist()
-        # sort edgeList and quantiles by quantiles
-        edgeList,quantiles = zip(*sorted(zip(edgeList,quantiles), key=lambda x: x[1], reverse=True))
+                             rankingAttribute = "quantile"):
+    edgesData = []
+    labels = mergedNetwork.vs["Label"]
+    rankData = mergedNetwork.es[rankingAttribute]
+    edgeList = mergedNetwork.get_edgelist()
+    # sort edgeList and quantiles by quantiles
+    edgeList,rankData = zip(*sorted(zip(edgeList,rankData), key=lambda x: x[1], reverse=True))
 
-        for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
-            fromLabel = labels[fromIndex]
-            toLabel = labels[toIndex]
-            if(thresholdAttribute=="pvalue"):
-                if quantiles[edgeIndex] < threshold:
-                    edgesData.append((fromLabel, toLabel))
-            else:
-                if quantiles[edgeIndex] > threshold:
-                    edgesData.append((fromLabel, toLabel))
-        uniqueUsers = set([user for edge in edgesData for user in edge])
-        coordinated = {
-            'confidence':1,
-            'description':"coordinated pairs based on unified indicator, sorted by quantile",
-            'name':"coordinated users pairs",
-            'pairs':edgesData,
-            'text':f'edges:{len(edgesData)},users:{len(uniqueUsers)}'
-        }
-        nonCoordinatedUsers = set(allUsers) - uniqueUsers
-        non_coordinated = {
-            'confidence':0,
-            'description':"non coordinated users based on unified indicator",
-            'name':"non coordinated users",
-            'text':f'users:{len(nonCoordinatedUsers)}',
-            'actors':list(nonCoordinatedUsers)
-        }
+    for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
+        fromLabel = labels[fromIndex]
+        toLabel = labels[toIndex]
+        edgesData.append((fromLabel, toLabel))
 
-        users = [coordinated,non_coordinated]
-        outputs[f"{threshold}"] = {"segments":users}
-    return outputs
+    uniqueUsers = set([user for edge in edgesData for user in edge])
+    coordinated = {
+        'confidence':1,
+        'description':"coordinated pairs based on unified indicator, sorted by quantile",
+        'name':"coordinated users pairs",
+        'pairs':edgesData,
+        'text':f'edges:{len(edgesData)},users:{len(uniqueUsers)}'
+    }
+    nonCoordinatedUsers = set(allUsers) - uniqueUsers
+    non_coordinated = {
+        'confidence':0,
+        'description':"non coordinated users based on unified indicator",
+        'name':"non coordinated users",
+        'text':f'users:{len(nonCoordinatedUsers)}',
+        'actors':list(nonCoordinatedUsers)
+    }
+
+    users = [coordinated,non_coordinated]
+    return {"segments":users}
+
 
 
 
@@ -572,32 +612,69 @@ def suspiciousTables(df,mergedNetwork,
     outputs = {}
     for threshold in thresholds:
         edgesData = []
-        labels = mergedNetwork.vs["Label"]
-        if "similarity" in mergedNetwork.es.attributes():
-            similarities = mergedNetwork.es["similarity"]
+        gFiltered = mergedNetwork.copy()
+        # filter edges removing thresholdAttribute
+        if(thresholdAttribute=="pvalue"):
+            gFiltered.delete_edges(gFiltered.es.select(pvalue_gt=threshold))
         else:
-            similarities = mergedNetwork.es["weight"]
-        if "Type" in mergedNetwork.es.attributes():
-            edgeTypes = mergedNetwork.es["Type"]
+            mask = np.array(gFiltered.es[thresholdAttribute]) < threshold
+            gFiltered.delete_edges(np.where(mask)[0])
+
+        # remove singletons
+        gFiltered.delete_vertices(gFiltered.vs.select(_degree=0))
+
+        labels = gFiltered.vs["Label"]
+        if "similarity" in gFiltered.es.attributes():
+            similarities = gFiltered.es["similarity"]
+        else:
+            similarities = gFiltered.es["weight"]
+        if "Type" in gFiltered.es.attributes():
+            edgeTypes = gFiltered.es["Type"]
         else:
             edgeTypes = ["NA"] * len(similarities)
-        quantiles = mergedNetwork.es[thresholdAttribute]
-        edgeList = mergedNetwork.get_edgelist()
+        
+        communities = ["NA"]*len(labels)
+        if("CommunityLabel" in gFiltered.vs.attributes()):
+            communities = gFiltered.vs["CommunityLabel"]
+            user2Community = {label:community for label,community in zip(labels,communities)}
+
+        extraFields = ["NA"]*len(labels)
+        if("ExtraField" in gFiltered.vs.attributes()):
+            extraFields = gFiltered.vs["ExtraField"]
+            user2ExtraField = {label:extraField for label,extraField in zip(labels,extraFields)}
+        
+        nodeStrengths = gFiltered.strength(weights=similarities)
+        nodeDegrees = gFiltered.degree()
+        user2Strength = {label:strength for label,strength in zip(labels,nodeStrengths)}
+        user2Degree = {label:degree for label,degree in zip(labels,nodeDegrees)}
+
+        communitySizes = Counter(communities)
+
+        quantiles = gFiltered.es[thresholdAttribute]
+        edgeList = gFiltered.get_edgelist()
         # sort edgeList and quantiles by quantiles
         edgeList,quantiles,similarities,edgeTypes = zip(*sorted(zip(edgeList,quantiles,similarities,edgeTypes), key=lambda x: x[1], reverse=True))
         
         for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
             fromLabel = labels[fromIndex]
             toLabel = labels[toIndex]
-            if(thresholdAttribute=="pvalue"):
-                if quantiles[edgeIndex] < threshold:
-                    edgesData.append((fromLabel, toLabel,quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex]))
-            else:
-                if quantiles[edgeIndex] > threshold:
-                    edgesData.append((fromLabel, toLabel,quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex]))
+            fromCommunity = communities[fromIndex]
+            toCommunity = communities[toIndex]
+            edgesData.append((fromLabel, toLabel, 
+                              quantiles[edgeIndex],similarities[edgeIndex],edgeTypes[edgeIndex],
+                              fromCommunity,toCommunity))
         uniqueUsers = set([user for edge in edgesData for user in edge[:2]])
-        dfEdges = pd.DataFrame(edgesData, columns=["From","To","Quantile","Similarity","Type"])
-        dfFiltered = df[df["user_id"].isin(uniqueUsers)]
+        dfEdges = pd.DataFrame(edgesData, columns=["From","To",thresholdAttribute,"Similarity","Type","fromCommunity","toCommunity"])
+        dfFiltered = df[df["user_id"].isin(uniqueUsers)].copy()
+        
+        dfFiltered["Community"] = dfFiltered["user_id"].apply(lambda x: user2Community.get(x,"NA"))
+        dfFiltered["CommunitySize"] = dfFiltered["Community"].apply(lambda x: communitySizes.get(x,0))
+        dfFiltered["ExtraField"] = dfFiltered["user_id"].apply(lambda x: user2ExtraField.get(x,"NA"))
+        dfFiltered["Strength"] = dfFiltered["user_id"].apply(lambda x: user2Strength.get(x,0))
+        dfFiltered["Degree"] = dfFiltered["user_id"].apply(lambda x: user2Degree.get(x,0))
+        # sort entries by strength and then user_id
+        dfFiltered = dfFiltered.sort_values(by=["Strength","user_id"],ascending=[False,True])
+
         outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
     return outputs
 

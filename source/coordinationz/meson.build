@@ -12,6 +12,7 @@ py_sources = files(
     'visualization.py',
     'textsimilarity_helper.py',
     'usc_text_similarity.py',
+    'communities.py',
 )
 
 
