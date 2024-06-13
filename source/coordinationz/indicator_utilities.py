@@ -9,12 +9,40 @@ import ast
 import numpy as np
 from collections import Counter
 
+from nltk.corpus import stopwords
+import nltk
 import re
 import spacy
 import nltk
 from nltk.corpus import stopwords
 import unalix
 from tqdm.auto import tqdm
+
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
+STOPWORD_SET = set(stopwords.words('english'))
+URL_PATTERN = re.compile(r'https?://\S+|www\.\S+')
+MENTION_PATTERN = re.compile(r'@\w+')
+DIGIT_PATTERN = re.compile(r'\d+')
+HTML_PATTERN = re.compile(r'<.*?>')
+HASHTAG_PATTERN = re.compile(r'#\w+')
+EMOJI_PATTERN = re.compile("["
+                       u"\U0001F600-\U0001F64F"
+                       u"\U0001F300-\U0001F5FF"
+                       u"\U0001F680-\U0001F6FF"
+                       u"\U0001F700-\U0001F77F"
+                       u"\U0001F780-\U0001F7FF"
+                       u"\U0001F800-\U0001F8FF"
+                       u"\U0001F900-\U0001F9FF"
+                       u"\U0001FA00-\U0001FA6F"
+                       u"\U0001FA70-\U0001FAFF"
+                       u"\U00002702-\U000027B0"
+                       u"\U000024C2-\U0001F251"
+                       "]+", flags=re.UNICODE)
+SPACY_DISABLED_COMPONENTS = ["parser", "ner", "textcat", "textcat_multilabel", "senter"]
 
 def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
     if minUserActivities > 0:
@@ -33,12 +61,14 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             # len(urls) should be >0
             userActivityCount = df[df["urls"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        # TODO: include retweet users
         else:
             # activity not retweet
-            userActivityCount = df[df["tweet_type"]!="retweet"]["user_id"].value_counts()
+            userActivityCount = df["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         df = df[df["user_id"].isin(usersWithMinActivities)]
     return df
+  
 
 def obtainBipartiteEdgesRetweets(df):
     # keep only tweet_type == "retweet"
@@ -46,17 +76,17 @@ def obtainBipartiteEdgesRetweets(df):
     if "linked_tweet" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
     df = df[df["tweet_type"] == "retweet"]
-    bipartiteEdges = df[["user_id","linked_tweet"]].values
+    bipartiteEdges = df[["user_id","linked_tweet"]].apply(tuple, axis=1).tolist()
     return bipartiteEdges
 
 
 def obtainBipartiteEdgesRetweetsUsers(df):
     # keep only tweet_type == "retweet"
     # if linked_tweet or tweet_type or user_id are not in the dataframe, return an empty list
-    if "linked_tweet_userid" not in df or "tweet_type" not in df or "user_id" not in df:
+    if "linked_tweet_user_id" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
     df = df[df["tweet_type"] == "retweet"]
-    bipartiteEdges = df[["user_id","linked_tweet_userid"]].values
+    bipartiteEdges = df[["user_id","linked_tweet_user_id"]].apply(tuple, axis=1).tolist()
     return bipartiteEdges
 
 
@@ -101,73 +131,73 @@ def obtainBipartiteEdgesHashtags(df,removeRetweets=True,removeQuotes=False,remov
     # create edges list users -> hashtags
     edges = [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     return edges
+  
 
-def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999):
-    embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
-    embed_keys, sentence_embeddings = ts.filter_active(df, embed_keys, sentence_embeddings, min_activity=min_activity, column=column)
-
-    bipartite_edges = ts.get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=n_buckets, seed=seed)
-
-<<<<<<< HEAD
 try:
-    nlp = spacy.load('en_core_web_lg')
+    nlp = spacy.load('en_core_web_lg', disable=SPACY_DISABLED_COMPONENTS)
 except OSError:
     from spacy.cli import download
     download('en_core_web_lg')
-    nlp = spacy.load('en_core_web_lg')
+    nlp = spacy.load('en_core_web_lg', disable=SPACY_DISABLED_COMPONENTS)
 
 
 def remove_emoji(text):
-    emoji_pattern = re.compile("["
-                           u"\U0001F600-\U0001F64F"  # emoticons
-                           u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-                           u"\U0001F680-\U0001F6FF"  # transport & map symbols
-                           u"\U0001F700-\U0001F77F"  # alchemical symbols
-                           u"\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
-                           u"\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
-                           u"\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
-                           u"\U0001FA00-\U0001FA6F"  # Chess Symbols
-                           u"\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
-                           u"\U00002702-\U000027B0"
-                           u"\U000024C2-\U0001F251"
-                           "]+", flags=re.UNICODE)
-    return emoji_pattern.sub(r'', text)
+    return EMOJI_PATTERN.sub(r'', text)
 
 
-def tokenizeTweet(text, ngram_range=(1, 2)):
-    # Check if NLTK stopwords are available, if: not download
-    try:
-        nltk.data.find('corpora/stopwords')
-    except LookupError:
-        nltk.download('stopwords')
-    
-    # Load English Stop Words
-    stopword_set = set(stopwords.words('english'))
+def cleanTweetText(text):
+    if not isinstance(text, str):
+        return ""
 
-    # Cleaning text
-    text = re.sub(r'https?://\S+|www\.\S+', " ", text)  # Remove URL
-    text = re.sub(r'@\w+', ' ', text)  # Remove mentions
-    text = re.sub(r'\d+', ' ', text)  # Remove digits
-    text = re.sub(r'<.*?>', ' ', text)  # Remove HTML tags
-    text = remove_emoji(text)  # Remove emoji
-    text = re.sub(r'#\w+', ' ', text)  # Remove hashtags
-    text = text.lstrip('RT')  # Remove RT word
+    text = URL_PATTERN.sub(" ", text)
+    text = MENTION_PATTERN.sub(" ", text)
+    text = DIGIT_PATTERN.sub(" ", text)
+    text = HTML_PATTERN.sub(" ", text)
+    text = remove_emoji(text)
+    text = HASHTAG_PATTERN.sub(" ", text)
+    if text.startswith("RT"):
+        text = text[2:]
+    return text
 
-    # Use spaCy to tokenize and lemmatize
-    doc = nlp(text)
-    tokens = [token.lemma_ for token in doc if token.lemma_.lower() not in stopword_set and not token.is_punct and not token.is_space]
-    # Include n-grams of size defined by ngram_range
+
+def _doc_to_ngrams(doc, ngram_range):
+    tokens = []
+    for token in doc:
+        lemma = token.lemma_.lower()
+        if token.is_punct or token.is_space or lemma in STOPWORD_SET or len(lemma) <= 2:
+            continue
+        tokens.append(lemma)
+
     ngrams = []
     for n in range(ngram_range[0], ngram_range[1] + 1):
-        ngrams.extend([" ".join(tokens[i:i+n]).lower() for i in range(len(tokens) - n + 1)])
+        ngrams.extend([" ".join(tokens[i:i+n]) for i in range(len(tokens) - n + 1)])
     return ngrams
 
 
+def tokenizeTweets(texts, ngram_range=(1, 2), batch_size=256):
+    cleaned_texts = [cleanTweetText(text) for text in texts]
+    docs = nlp.pipe(cleaned_texts, batch_size=batch_size)
+    return [
+        _doc_to_ngrams(doc, ngram_range)
+        for doc in tqdm(docs, total=len(cleaned_texts), desc="Tokenizing text...")
+    ]
 
-def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeReplies=False, ngramSize = 1):
+
+def tokenizeTweet(text, ngram_range=(1, 2)):
+    cleaned_text = cleanTweetText(text)
+    if not cleaned_text.strip():
+        return []
+
+    doc = nlp(cleaned_text)
+    return _doc_to_ngrams(doc, ngram_range)
+
+
+
+def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeReplies=False, ngramSize = 1, batch_size=256):
     if "text" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
-    
+    # drop all rows with missing text
+    df = df.dropna(subset=["text"])
     if(removeRetweets):
         df = df[df["tweet_type"] != "retweet"]
     if(removeQuotes):
@@ -178,13 +208,17 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
     # convert url strings that looks like lists to actual lists
     users = df["user_id"]
     textData = df["text"]
-    if("data_translatedContentText" in df):
+
+    if("data_translatedContentText" in df and not df["data_translatedContentText"].isna().all()):
         textData = df["data_translatedContentText"].copy()
         # for the nans, use the original text
         mask = textData.isna()
         textData.loc[mask] = df["text"][mask]
 
-    tokens = df["text"].progress_apply(lambda x: tokenizeTweet(x,ngram_range=(1,ngramSize)))
+    tokens = pd.Series(
+        tokenizeTweets(textData.tolist(), ngram_range=(1,ngramSize), batch_size=batch_size),
+        index=textData.index,
+    )
     # keep only non-empty lists
     mask = tokens.apply(lambda x: len(x) > 0)
     tokens = tokens[mask]
@@ -192,36 +226,105 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
     # create edges list users -> hashtags
     edges = [(user,token) for user,token_list in zip(users,tokens) for token in token_list]
     return edges
+  
 
-=======
+def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999,**kargs):
+    from . import textsimilarity_helper as ts
+    embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
+    embed_keys, sentence_embeddings = ts.filter_active(df, embed_keys, sentence_embeddings, min_activity=min_activity, column=column)
+
+    bipartite_edges = ts.get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=n_buckets, seed=seed)
+
     return bipartite_edges
->>>>>>> 2e20fe2 (First working version of text similarity)
+  
+
+# def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
+#     # goes from right to left
+#     bipartiteEdges = np.array(bipartiteEdges)
+#     mask = np.ones(len(bipartiteEdges),dtype=bool)
+#     if(minRightDegree>1):
+#         uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
+#         uniqueEdges = np.array(list(uniqueEdges))
+#         rightDegrees = Counter(uniqueEdges[:,1])
+#         mask &= np.array([rightDegrees[rightNode]>=minRightDegree for _,rightNode in bipartiteEdges])
+#     if(minRightStrength>1):
+#         rightStrengths = Counter(bipartiteEdges[:,1])
+#         mask &= np.array([rightStrengths[rightNode]>=minRightStrength for _,rightNode in bipartiteEdges])
+#     bipartiteEdges = bipartiteEdges[mask]
+    
+#     # goes from left to right
+#     mask = np.ones(len(bipartiteEdges),dtype=bool)
+#     if(minLeftDegree>1):
+#         uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
+#         uniqueEdges = np.array(list(uniqueEdges))
+#         leftDegrees = Counter(uniqueEdges[:,0])
+#         mask &= np.array([leftDegrees[leftNode]>=minLeftDegree for leftNode,_ in bipartiteEdges])
+#     if(minLeftStrength>1):
+#         leftStrengths = Counter(bipartiteEdges[:,0])
+#         mask &= np.array([leftStrengths[leftNode]>=minLeftStrength for leftNode,_ in bipartiteEdges])
+#     bipartiteEdges = bipartiteEdges[mask]
+
+#     return bipartiteEdges
+
+# def filterNodesAlternative(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
+#     bipartiteEdges = np.array(bipartiteEdges)
+    
+#     # Right side filtering
+#     if minRightDegree > 1 or minRightStrength > 1:
+#         unique_right, right_counts = np.unique(bipartiteEdges[:, 1], return_counts=True)
+        
+#         if minRightDegree > 1:
+#             valid_right_degree = unique_right[right_counts >= minRightDegree]
+#             mask_degree = np.isin(bipartiteEdges[:, 1], valid_right_degree)
+#             bipartiteEdges = bipartiteEdges[mask_degree]
+        
+#         if minRightStrength > 1:
+#             right_strengths = np.bincount(bipartiteEdges[:, 1])
+#             valid_right_strength = np.where(right_strengths >= minRightStrength)[0]
+#             mask_strength = np.isin(bipartiteEdges[:, 1], valid_right_strength)
+#             bipartiteEdges = bipartiteEdges[mask_strength]
+
+#     # Left side filtering
+#     if minLeftDegree > 1 or minLeftStrength > 1:
+#         unique_left, left_counts = np.unique(bipartiteEdges[:, 0], return_counts=True)
+        
+#         if minLeftDegree > 1:
+#             valid_left_degree = unique_left[left_counts >= minLeftDegree]
+#             mask_degree = np.isin(bipartiteEdges[:, 0], valid_left_degree)
+#             bipartiteEdges = bipartiteEdges[mask_degree]
+        
+#         if minLeftStrength > 1:
+#             left_strengths = np.bincount(bipartiteEdges[:, 0])
+#             valid_left_strength = np.where(left_strengths >= minLeftStrength)[0]
+#             mask_strength = np.isin(bipartiteEdges[:, 0], valid_left_strength)
+#             bipartiteEdges = bipartiteEdges[mask_strength]
+    
+#     return bipartiteEdges
 
 def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
-    # goes from right to left
-    bipartiteEdges = np.array(bipartiteEdges)
-    mask = np.ones(len(bipartiteEdges),dtype=bool)
-    if(minRightDegree>1):
-        uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
-        uniqueEdges = np.array(list(uniqueEdges))
-        rightDegrees = Counter(uniqueEdges[:,1])
-        mask &= np.array([rightDegrees[rightNode]>=minRightDegree for _,rightNode in bipartiteEdges])
-    if(minRightStrength>1):
-        rightStrengths = Counter(bipartiteEdges[:,1])
-        mask &= np.array([rightStrengths[rightNode]>=minRightStrength for _,rightNode in bipartiteEdges])
-    bipartiteEdges = bipartiteEdges[mask]
+    # Process right nodes
+    if minRightDegree > 1 or minRightStrength > 1:
+        uniqueEdges = set(bipartiteEdges)
+        rightDegrees = Counter(rightNode for _, rightNode in uniqueEdges)
+        rightStrengths = Counter(rightNode for _, rightNode in bipartiteEdges)
+        rightNodesToKeep = set(rightDegrees.keys())
+        if minRightDegree > 1:
+            rightNodesToKeep &= {node for node, degree in rightDegrees.items() if degree >= minRightDegree}
+        if minRightStrength > 1:
+            rightNodesToKeep &= {node for node, strength in rightStrengths.items() if strength >= minRightStrength}
+        bipartiteEdges = [edge for edge in bipartiteEdges if edge[1] in rightNodesToKeep]
     
-    # goes from left to right
-    mask = np.ones(len(bipartiteEdges),dtype=bool)
-    if(minLeftDegree>1):
-        uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
-        uniqueEdges = np.array(list(uniqueEdges))
-        leftDegrees = Counter(uniqueEdges[:,0])
-        mask &= np.array([leftDegrees[leftNode]>=minLeftDegree for leftNode,_ in bipartiteEdges])
-    if(minLeftStrength>1):
-        leftStrengths = Counter(bipartiteEdges[:,0])
-        mask &= np.array([leftStrengths[leftNode]>=minLeftStrength for leftNode,_ in bipartiteEdges])
-    bipartiteEdges = bipartiteEdges[mask]
+    # Process left nodes
+    if minLeftDegree > 1 or minLeftStrength > 1:
+        uniqueEdges = set(bipartiteEdges)
+        leftDegrees = Counter(leftNode for leftNode, _ in uniqueEdges)
+        leftStrengths = Counter(leftNode for leftNode, _ in bipartiteEdges)
+        leftNodesToKeep = set(leftDegrees.keys())
+        if minLeftDegree > 1:
+            leftNodesToKeep &= {node for node, degree in leftDegrees.items() if degree >= minLeftDegree}
+        if minLeftStrength > 1:
+            leftNodesToKeep &= {node for node, strength in leftStrengths.items() if strength >= minLeftStrength}
+        bipartiteEdges = [edge for edge in bipartiteEdges if edge[0] in leftNodesToKeep]
 
     return bipartiteEdges
 
@@ -320,7 +423,6 @@ def parseParameters(config,indicators):
 
     networkParametersMap = {
         "similarityThreshold":("similarityThreshold",0.0),
-        "zscoreThreshold":("zscoreThreshold",0.0),
         "pvalueThreshold":("pvalueThreshold",1.0),
     }
 
@@ -341,13 +443,13 @@ def parseParameters(config,indicators):
         specificNetworkOptions[indicator] = {**generalNetworkOptions, **specificConfig}
 
     nullModelOptions = {
-        "scoreType": ("scoreType",["zscore","pvalue-quantized"]),
+        "scoreType": ("scoreType",["pvalue"]),
         "realizations":("realizations",10000),
-        "pvaluesQuantized":("pvaluesQuantized",None),
         "idf":("idf","smoothlog"), # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         "minSimilarity":("minSimilarity",0.1),
         "batchSize":("batchSize",10),
         "workers":("workers",10),
+        "normalizeRealizationsPerDegreePair": ("normalizeRealizationsPerDegreePair", True),
     }
 
     generalNullModelOptions = {}
@@ -372,13 +474,11 @@ def parseParameters(config,indicators):
         # weightAttribute = "similarity"
         # quantileThreshold = 0.0
         # pvalueThreshold = 1.0
-        # zscoreThreshold = 0.0
         # similarityThreshold = 0.0
         "shouldAggregate": ("shouldAggregate",True),
         "weightAttribute": ("weightAttribute","similarity"),
         "quantileThreshold": ("quantileThreshold",0.0),
         "pvalueThreshold": ("pvalueThreshold",1.0),
-        "zscoreThreshold": ("zscoreThreshold",0.0),
         "similarityThreshold": ("similarityThreshold",0.0),
     }
 
@@ -408,6 +508,7 @@ def parseParameters(config,indicators):
         "thresholdAttribute": ("thresholdAttribute","quantile"),
         "thresholds": ("thresholds",[0.95,0.99]),
         "extraThresholds": ("extraThresholds",{}),
+        "filters": ("filters",{}),
     }
 
     generalOutputOptions = {}
@@ -416,6 +517,7 @@ def parseParameters(config,indicators):
             generalOutputOptions[param] = outputConfig[key]
         else:
             generalOutputOptions[param] = default
+    
 
     returnValue = {}
     returnValue["user"] = specificUserFilterOptions
@@ -426,6 +528,7 @@ def parseParameters(config,indicators):
     returnValue["merging"] = generalMergingOptions
     returnValue["community"] = generalCommunitiesOptions
     returnValue["output"] = generalOutputOptions
+
     return returnValue
 
 
@@ -442,7 +545,6 @@ def mergeNetworks(networksDictionary,
                   weightAttribute="similarity",
                   quantileThreshold=0.0,
                   pvalueThreshold=1.0,
-                  zscoreThreshold=0.0,
                   similarityThreshold=0.0):
     # merge the networks via property Label
     label2Index = {}
@@ -474,21 +576,17 @@ def mergeNetworks(networksDictionary,
             nodeAttributes = {key:[] for key in network.vs.attributes()}
         if not edgeAttributes:
             edgeAttributes = {key:[] for key in network.es.attributes()}
+
+        # add all labels to label2Index and index2Label
+        for i, label in enumerate(labels):
+            if label not in label2Index:
+                label2Index[label] = len(label2Index)
+                for key in nodeAttributes:
+                    if key in network.vs.attributes():
+                        nodeAttributes[key].append(network.vs[i][key])
         for edgeIndex,(fromIndex, toIndex) in enumerate(network.get_edgelist()):
             fromLabel = labels[fromIndex]
             toLabel = labels[toIndex]
-            if fromLabel not in label2Index:
-                label2Index[fromLabel] = len(label2Index)
-                index2Label[len(index2Label)] = fromLabel
-                for key in nodeAttributes:
-                    if key in network.vs.attributes():
-                        nodeAttributes[key].append(network.vs[fromIndex][key])
-            if toLabel not in label2Index:
-                label2Index[toLabel] = len(label2Index)
-                index2Label[len(index2Label)] = toLabel
-                for key in nodeAttributes:
-                    if key in network.vs.attributes():
-                        nodeAttributes[key].append(network.vs[toIndex][key])
             edges.append((label2Index[fromLabel], label2Index[toLabel]))
             edgeType.append(networkType)
             for key in edgeAttributes:
@@ -501,13 +599,11 @@ def mergeNetworks(networksDictionary,
         combineEdges = {}
         if("similarity" in mergedNetwork.es.attributes()):
             combineEdges["similarity"] = combineMethod
-        if("zscore" in mergedNetwork.es.attributes()):
-            combineEdges["zscore"] = combineMethod
         if("pvalue" in mergedNetwork.es.attributes()):
             # use product of (1-pvalue)
-            pvalueTransformed = 1-np.array(mergedNetwork.es["pvalue"])
-            mergedNetwork.es["1-pvalue"] = pvalueTransformed
-            combineEdges["1-pvalue"] = combineMethodProbabilistic
+            # pvalueTransformed = 1-np.array(mergedNetwork.es["pvalue"])
+            # mergedNetwork.es["pvalue"] = pvalueTransformed
+            combineEdges["pvalue"] = combineMethodProbabilistic
         if("quantile" in mergedNetwork.es.attributes()):
             quantileTransformed = 1-np.array(mergedNetwork.es["quantile"])
             mergedNetwork.es["1-quantile"] = quantileTransformed
@@ -522,13 +618,13 @@ def mergeNetworks(networksDictionary,
         # print("--------")
         # print(f"Using {weightAttribute} as the weight attribute")
         # print("--------")
+        if(weightAttribute == "1-pvalue"):
+            mergedNetwork.es["weight"] = 1-np.array(mergedNetwork.es["pvalue"])
         if(weightAttribute in mergedNetwork.es.attributes()):
             mergedNetwork.es["weight"] = np.nan_to_num(mergedNetwork.es[weightAttribute], nan=0.0)
     mask = np.ones(mergedNetwork.ecount(),dtype=bool)
     if(similarityThreshold > 0.0):
         mask &= np.array(mergedNetwork.es["similarity"]) > similarityThreshold
-    if(zscoreThreshold > 0.0):
-        mask &= np.array(mergedNetwork.es["zscore"]) > zscoreThreshold
     if(pvalueThreshold < 1.0):
         mask &= np.array(mergedNetwork.es["pvalue"]) < pvalueThreshold
     if(quantileThreshold > 0.0):
@@ -673,5 +769,3 @@ def suspiciousTables(df,mergedNetwork,
 
         outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
     return outputs
-
-
