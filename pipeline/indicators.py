@@ -215,7 +215,7 @@ if __name__ == "__main__": # Needed for parallel processing
         print("rankingAttributes not provided, using thresholdAttribute instead...")
     else:
         rankingAttributes = runParameters["output"]["rankingAttributes"]
-        
+
     for threshold in runParameters["output"]["thresholds"]:
         thresholdOptions = {}
         thresholdOptions[thresholdAttribute] = threshold
@@ -234,10 +234,25 @@ if __name__ == "__main__": # Needed for parallel processing
         
         xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged_{threshold}.xnet")
 
-        
         print(f"Saving data...")
-        incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
-                                                    rankingAttributes = rankingAttributes)
+        if "community" in runParameters and runParameters["community"]["detectCommunity"]:
+            strategy = runParameters["community"]["rankingStrategy"]
+
+            if "weightAttribute" not in runParameters["community"]:
+                weightAttribute = thresholdAttribute
+                print("weightAttribute not provided, using thresholdAttribute instead...")
+            else:
+                weightAttribute = runParameters["community"]["weightAttribute"]
+
+            if "extraThresholds" in runParameters["output"]:
+                communitySize = runParameters["output"]["extraThresholds"].get("communitySize")
+
+            thresholdCommunities = czind.rankCommunities(mergedNetwork, strategy=strategy, weightAttribute=thresholdAttribute)
+            incasOutput = czind.generateEdgesINCASOutputCommunities(thresholdCommunities, allUsers,
+                                                                    rankingAttributes = rankingAttributes, communitySize=communitySize)
+        else:
+            incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
+                                                        rankingAttributes = rankingAttributes)
         
         # suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
         # suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)

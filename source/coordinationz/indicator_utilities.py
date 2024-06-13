@@ -585,6 +585,51 @@ def rankCommunities(gThresholded, strategy="mean", weightAttribute="weight"):
 
     return communities
 
+def generateEdgesINCASOutputCommunities(communities, allUsers,
+                             rankingAttributes = ["quantile"], communitySize=None):
+    edgesData = []
+    skipCount = 0
+    for community in communities:
+        if communitySize is not None and community.vcount() < communitySize:
+            skipCount += 1
+            continue
+
+        labels = community.vs["Label"]
+        edgeList = community.get_edgelist()
+
+        # sort edgeList and quantiles by quantiles
+        for rankingAttribute in rankingAttributes[::-1]:
+            rankData = community.es[rankingAttribute]    
+            edgeList, _ = zip(*sorted(zip(edgeList, rankData), key=lambda x: x[1], reverse=True))
+
+        for _, (fromIndex, toIndex) in enumerate(edgeList):
+            fromLabel = labels[fromIndex]
+            toLabel = labels[toIndex]
+            edgesData.append((fromLabel, toLabel))
+
+    if skipCount > 0:
+        print(f"Skipped {skipCount} communities below the size threshold...")
+
+    uniqueUsers = set([user for edge in edgesData for user in edge])
+    coordinated = {
+        'confidence':1,
+        'description':"coordinated pairs based on unified indicator, sorted by quantile",
+        'name':"coordinated users pairs",
+        'pairs':edgesData,
+        'text':f'edges:{len(edgesData)},users:{len(uniqueUsers)}'
+    }
+    nonCoordinatedUsers = set(allUsers) - uniqueUsers
+    non_coordinated = {
+        'confidence':0,
+        'description':"non coordinated users based on unified indicator",
+        'name':"non coordinated users",
+        'text':f'users:{len(nonCoordinatedUsers)}',
+        'actors':list(nonCoordinatedUsers)
+    }
+
+    users = [coordinated, non_coordinated]
+    return {"segments": users}
+
 def generateEdgesINCASOutput(mergedNetwork, allUsers,
                              rankingAttributes = ["quantile"]):
     edgesData = []
