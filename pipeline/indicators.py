@@ -209,6 +209,13 @@ if __name__ == "__main__": # Needed for parallel processing
     
 
     thresholdAttribute = runParameters["output"]["thresholdAttribute"]
+
+    if "rankingAttributes" not in runParameters["output"]:
+        rankingAttributes = [thresholdAttribute]
+        print("rankingAttributes not provided, using thresholdAttribute instead...")
+    else:
+        rankingAttributes = runParameters["output"]["rankingAttributes"]
+        
     for threshold in runParameters["output"]["thresholds"]:
         thresholdOptions = {}
         thresholdOptions[thresholdAttribute] = threshold
@@ -230,7 +237,7 @@ if __name__ == "__main__": # Needed for parallel processing
         
         print(f"Saving data...")
         incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
-                                                    rankingAttribute = thresholdAttribute)
+                                                    rankingAttributes = rankingAttributes)
         
         # suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
         # suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)

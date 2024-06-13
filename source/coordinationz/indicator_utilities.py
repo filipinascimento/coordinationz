@@ -570,7 +570,7 @@ def rankCommunities(gThresholded, strategy="mean", weightAttribute="weight"):
     for v, index in enumerate(gThresholded.vs["CommunityIndex"]):
         communities[index].append(v)
 
-    communities = list(map(gThresholded.subgraph, map(gThresholded.vs.select, communities.values())))
+    communities = [gThresholded.subgraph(gThresholded.vs.select(c)) for c in communities.values()]
     
     if strategy == "mean":
         ranking = lambda c: c.vs[0]["CommunityEdgesAvg_" + weightAttribute]
@@ -586,13 +586,15 @@ def rankCommunities(gThresholded, strategy="mean", weightAttribute="weight"):
     return communities
 
 def generateEdgesINCASOutput(mergedNetwork, allUsers,
-                             rankingAttribute = "quantile"):
+                             rankingAttributes = ["quantile"]):
     edgesData = []
     labels = mergedNetwork.vs["Label"]
-    rankData = mergedNetwork.es[rankingAttribute]
     edgeList = mergedNetwork.get_edgelist()
+
     # sort edgeList and quantiles by quantiles
-    edgeList,rankData = zip(*sorted(zip(edgeList,rankData), key=lambda x: x[1], reverse=True))
+    for rankingAttribute in rankingAttributes[::-1]:
+        rankData = mergedNetwork.es[rankingAttribute]    
+        edgeList, _ = zip(*sorted(zip(edgeList, rankData), key=lambda x: x[1], reverse=True))
 
     for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
         fromLabel = labels[fromIndex]
