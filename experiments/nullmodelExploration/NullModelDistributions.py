@@ -38,7 +38,7 @@ if __name__ == "__main__": # Needed for parallel processing
         bipartiteEdges,
         scoreType="onlynullmodel",
         realizations=100000,
-        idf="linear", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
+        idf="none", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         batchSize=100,
         workers=-1,
     )

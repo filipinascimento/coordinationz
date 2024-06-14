@@ -30,7 +30,7 @@ if __name__ == "__main__": # Needed for parallel processing
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
         scoreType=["zscore","pvalue-quantized"], # pvalue-quantized, pvalue, or zscore, 
-        pvaluesQuantized=[0.0001,0.005,0.001,0.005,0.01,0.05,0.1,0.25,0.5],
+        pvaluesQuantized=[0.0001,0.0005,0.001,0.005,0.01,0.05,0.1,0.25,0.5],
         realizations=10000,
         batchSize=1000,
         idf="none", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
