@@ -210,11 +210,11 @@ if __name__ == "__main__": # Needed for parallel processing
 
     thresholdAttribute = runParameters["output"]["thresholdAttribute"]
 
-    if "rankingAttributes" not in runParameters["output"]:
-        rankingAttributes = [thresholdAttribute]
-        print("rankingAttributes not provided, using thresholdAttribute instead...")
+    if "rankingAttributes" not in config["output"]:
+        rankingAttributes = ["weight"]
+        print("rankingAttributes not provided, using weight by default...")
     else:
-        rankingAttributes = runParameters["output"]["rankingAttributes"]
+        rankingAttributes = config["output"]["rankingAttributes"]
 
     for threshold in runParameters["output"]["thresholds"]:
         thresholdOptions = {}
@@ -224,7 +224,14 @@ if __name__ == "__main__": # Needed for parallel processing
         
         if("community" in runParameters and runParameters["community"]["detectCommunity"]):
             print(f"Finding communities in the merged network...")
-            mergedNetwork = czcom.getNetworksWithCommunities(mergedNetwork.copy()) #**runParameters["communities"][networkName]
+
+            if "weightAttribute" not in config["community"]:
+                weightAttribute = "weight"
+                print("weightAttribute not provided, using weight by default...")
+            else:
+                weightAttribute = config["community"]["weightAttribute"]
+
+            mergedNetwork = czcom.getNetworksWithCommunities(mergedNetwork.copy(), weightAttribute=weightAttribute) #**runParameters["communities"][networkName]
             if(runParameters["community"]["computeCommunityLabels"]):
                 print(f"Computing community labels for the merged network...")
                 mergedNetwork = czcom.labelCommunities(df,mergedNetwork,tweetIDTextCache)
@@ -234,31 +241,31 @@ if __name__ == "__main__": # Needed for parallel processing
         
         xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged_{threshold}.xnet")
 
-        print(f"Saving data...")
         if "community" in runParameters and runParameters["community"]["detectCommunity"]:
-            strategy = runParameters["community"]["rankingStrategy"]
+            print("Ranking communities...")
 
-            if "weightAttribute" not in runParameters["community"]:
-                weightAttribute = thresholdAttribute
-                print("weightAttribute not provided, using thresholdAttribute instead...")
+            strategy = config["community"]["rankingStrategy"]
+
+            if "extraThresholds" in config["output"]:
+                communitySize = config["output"]["extraThresholds"].get("communitySize")
             else:
-                weightAttribute = runParameters["community"]["weightAttribute"]
+                communitySize = None
 
-            if "extraThresholds" in runParameters["output"]:
-                communitySize = runParameters["output"]["extraThresholds"].get("communitySize")
-
-            thresholdCommunities = czind.rankCommunities(mergedNetwork, strategy=strategy, weightAttribute=thresholdAttribute)
-            incasOutput = czind.generateEdgesINCASOutputCommunities(thresholdCommunities, allUsers,
-                                                                    rankingAttributes = rankingAttributes, communitySize=communitySize)
+            thresholdCommunities = czind.rankCommunities(mergedNetwork, strategy=strategy, weightAttribute=weightAttribute)
+            edgesData = czind.generateEdgesCommunities(thresholdCommunities, 
+                                                       rankingAttributes = rankingAttributes, communitySize=communitySize)
         else:
-            incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
-                                                        rankingAttributes = rankingAttributes)
+            edgesData = czind.generateEdges(mergedNetwork, rankingAttributes = rankingAttributes)
         
         # suspiciousEdgesData = czind.mergedSuspiciousEdges(mergedNetwork)
         # suspiciousClustersData = czind.mergedSuspiciousClusters(mergedNetwork)
         # suspiciousEdgesData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges.csv",index=False)
         # suspiciousClustersData.to_csv(tablesPath/f"{dataName}_{suffix}_merged_clusters.csv")
         # save incasOutput to a json file
+
+        print(f"Saving data...")
+        incasOutput = czind.generateINCASOutput(edgesData, allUsers)
+
         with open(tablesPath/f"{dataName}_{suffix}_segments_{threshold}.json", "w") as f:
             json.dump(incasOutput, f)
         
