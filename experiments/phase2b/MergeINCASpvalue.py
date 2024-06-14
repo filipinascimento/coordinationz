@@ -58,3 +58,14 @@ if __name__ == "__main__": # Needed for parallel processing
     label2Cluster.index.name = "User"
     label2Cluster.to_csv(networksPath/f"{dataName}_merged_clusters.csv")
 
+    # also save the edges
+    edgesData = []
+    for fromIndex, toIndex in mergedNetwork.get_edgelist():
+        fromLabel = index2Label[fromIndex]
+        toLabel = index2Label[toIndex]
+        edges.append((fromLabel, toLabel))
+    edges = pd.DataFrame(edges, columns=["From","To"])
+    
+    edges.to_csv(networksPath/f"{dataName}_merged_edges.csv")
+# Path: experiments/phase2b/MergeINCASpvalue.py
+

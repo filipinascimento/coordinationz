@@ -20,8 +20,8 @@ dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
 networkType = "merged"
 # suffix = "all_coword_min0.2_v5"
 suffix = "all_union_coword_0.8_0.85"
-thresholdAttribute = "quantile"
-scoresAttribute = "weight"
+scoresAttribute = "weight" # UNION
+# scoreAttribute = "quantile" # SOFT
 threshold = 0
 configPath = None
 
@@ -258,7 +258,7 @@ if(edgeTest is None):
 
 with open(f"Outputs/Tables/{dataName}_{suffix}_{networkType}_edgeTest.txt", "w") as file:
     # printEdge(edgeTest, file=file)
-    printEdge(topEdgesFiltered[1],file)
+    printEdge(topEdgesFiltered[3],file)
 
 
 

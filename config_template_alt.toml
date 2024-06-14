@@ -21,7 +21,7 @@ pvaluesQuantized = [0.00001,0.00002,0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,
 batchSize = 10
 idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
 workers = -1 # Number of parallel workers. If -1, all the available cores will be used
-minSimilarity = 0.0 # will only consider similarities above that value
+minSimilarity = 0.5 # will only consider similarities above that value
 # Specific settings for nullmodel of indicators
 # will overwrite the general settings
 # Example:
