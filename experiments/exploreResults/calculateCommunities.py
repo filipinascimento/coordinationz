@@ -73,15 +73,15 @@ if("data_translatedContentText" in df):
 
 
 typeToSuffix = {
-    # ("merged","all"),
+    ("merged","all"),
     # ("coretweet","all"),
     # ("cohashtag","all"),
     # ("courl","all"),
     # ("coword","all"),
     # ("merged","alltextsim"),
-    ("textsimilarity","alltextsim"),
-    ("merged","allusc"),
-    ("usctextsimilarity","allusc"),
+    # ("textsimilarity","alltextsim"),
+    # ("merged","allusc"),
+    # ("usctextsimilarity","allusc"),
 }
 
 
@@ -116,68 +116,74 @@ for networkType,suffix in typeToSuffix:
 
 
     if newUsersInSynth:
-        g.vs["Synthetic"] = ["Natural"]*g.vcount()
+        g.vs["ExtraField"] = ["Natural"]*g.vcount()
         # newUsersInSynt
         # usersWithNewTweetsInSynth
         for userIndex in range(g.vcount()):
             user = g.vs[userIndex]
             if user["Label"] in newUsersInSynth:
-                user["Synthetic"] = "New Synth User"
+                user["ExtraField"] = "New Synth User"
             elif user["Label"] in usersWithNewTweetsInSynth:
-                user["Synthetic"] = "New Synth Tweets"
+                user["ExtraField"] = "New Synth Tweets"
 
     quantiles = np.array(g.es["quantile"])
-    if("similarity" in g.es.attributes()):
-        similarities = np.array(g.es["similarity"])
-    elif("weight" in g.es.attributes()):
+    # if("similarity" in g.es.attributes()):
+    #     similarities = np.array(g.es["similarity"])
+    if("weight" in g.es.attributes()):
         similarities = np.array(g.es["weight"])
 
-    quantileMarkers = [0.90,0.95,0.99,0.995,0.999,0.9995,0.9999]
+    quantileMarkers = [0.90,0.95,0.99,0.995,0.999,0.9995,0.9999,0.99995,0.99999]
     # two histograms one on top of the other same x axis
     fig, axes = plt.subplots(2, 1, sharex=True,figsize=(4,5))
 
     # cumulative
-    axes[0].hist(similarities, bins=50, cumulative=True, density=True)
+    axes[0].hist(similarities, bins=50, cumulative=True, density=True,color="#AAAAAA")
     # density with log y axis
-    axes[1].hist(similarities, bins=50)
+    axes[1].hist(similarities, bins=50,color="#AAAAAA")
     axes[1].set_yscale('log')
     # create vertical bars for quantiles markers
     previousQuantilePosition = -1
+    differenceMaxMin = np.max(similarities) - np.min(similarities)
     for marker in sorted(quantileMarkers,reverse=True):
         # use quantile variable first point above or equal quantile
         quantilePosition = similarities[np.argmax(quantiles >= marker)]
-        if(previousQuantilePosition == quantilePosition):
+        if(np.abs(previousQuantilePosition - quantilePosition)<0.04*differenceMaxMin):
             continue
         previousQuantilePosition = quantilePosition
         # quantilePosition = np.quantile(similarities, marker)
-        axes[0].axvline(quantilePosition,color="red", linestyle="--")
-        axes[1].axvline(quantilePosition,color="red", linestyle="--")
+        axes[0].axvline(quantilePosition,color="#CC5555", linestyle="--")
+        axes[1].axvline(quantilePosition,color="#CC5555", linestyle="--")
         # also add text
         # number of links
         remainingLinks = np.sum(similarities >= quantilePosition)
         print(f"Number of links above {marker}: {remainingLinks}")
         # number of remaining nodes in the network
         gthreshold = g.copy()
-        if("similarity" in g.es.attributes()):
-            gthreshold.delete_edges(gthreshold.es.select(similarity_lt=quantilePosition))
-        elif("weight" in g.es.attributes()):
+        # if("similarity" in g.es.attributes()):
+        #     gthreshold.delete_edges(gthreshold.es.select(similarity_lt=quantilePosition))
+        if("weight" in g.es.attributes()):
             gthreshold.delete_edges(gthreshold.es.select(weight_lt=quantilePosition))
         # remove singletons
         gthreshold.delete_vertices(gthreshold.vs.select(_degree=0))
         remainingNodes = len(gthreshold.vs)
         print(f"Number of nodes in the network above {marker}: {remainingNodes}")
-        axes[0].text(quantilePosition, 0.5, f"{marker} ({remainingLinks}, {remainingNodes})", rotation=90,va="center")
+        axes[0].text(quantilePosition+0.02*differenceMaxMin, 0.5, f"{marker}: {remainingLinks}e {remainingNodes}u", color="#220000", rotation=90,va="center")
         # get axes1 mid y log scale
         ytopLim = axes[1].get_ylim()[1]
         ybottomLim = axes[1].get_ylim()[0]
         midy = np.sqrt(ytopLim*ybottomLim)
-        axes[1].text(quantilePosition, midy, f"{marker} ({remainingLinks}, {remainingNodes})", rotation=90,va="center")
+        axes[1].text(quantilePosition+0.01*differenceMaxMin, midy, f"{marker}: {remainingLinks}e {remainingNodes}u", color="#220000", rotation=90,va="center")
 
-    axes[0].set_xlabel("Similarity")
-    axes[0].set_xlabel("Similarity")
+    # axes[0].set_xlabel("Weight")
+    axes[1].set_xlabel("Weight")
     axes[0].set_ylabel("Density (sim. > 0.2)")
     axes[1].set_ylabel("Counts")
     axes[0].set_title(f"Sim. ({suffix},{networkType})")
+    # remove right and top frame
+    axes[0].spines['right'].set_visible(False)
+    axes[0].spines['top'].set_visible(False)
+    axes[1].spines['right'].set_visible(False)
+    axes[1].spines['top'].set_visible(False)
     plt.tight_layout()
     plt.savefig(figuresOutputPath/f"sim_distribution_{dataName}_{suffix}_{networkType}.png")
     plt.savefig(figuresOutputPath/f"sim_distribution_{dataName}_{suffix}_{networkType}.pdf")
@@ -185,7 +191,7 @@ for networkType,suffix in typeToSuffix:
 
 
     # for threshold in [0.990, 0.999, 0.9995, 0.9999, 0.99995, 0.99999]:
-    for threshold in [0.990, 0.999]:
+    for threshold in [0.9999, 0.99999]:
         thresholdAttribute = "quantile"
         
 
