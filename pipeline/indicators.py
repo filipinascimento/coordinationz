@@ -264,6 +264,7 @@ if __name__ == "__main__": # Needed for parallel processing
         # save incasOutput to a json file
 
         print(f"Saving data...")
+        allUsers = set(df["user_id"].values)
         incasOutput = czind.generateINCASOutput(edgesData, allUsers)
 
         with open(tablesPath/f"{dataName}_{suffix}_segments_{threshold}.json", "w") as f:
