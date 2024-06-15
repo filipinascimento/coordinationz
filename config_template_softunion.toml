@@ -81,10 +81,13 @@ shouldAggregate = true
 ["community"]
 detectCommunity = true
 computeCommunityLabels = false
+# Enable for computing the summarized labels of the communities
 
 ["output"]
 thresholdAttribute = "quantile"
-thresholds = [0.95,0.99,0.999,0.9999,0.99999]
+thresholds = [0.99]
+# Other thresholds that can be used:
+# thresholds = [0.95,0.99,0.999,0.9999,0.99999]
 
 # Specific extra thresholds for the output
 # based on other features

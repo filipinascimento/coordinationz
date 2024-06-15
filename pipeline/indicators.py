@@ -229,6 +229,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
         
         print(f"Saving data...")
+        allUsers = set(df["user_id"].values)
         incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
                                                     rankingAttribute = thresholdAttribute)
         
