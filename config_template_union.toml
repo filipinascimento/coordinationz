@@ -50,6 +50,7 @@ minUserActivities = 10
 
 
 # Thresholds for all the indicators
+# Union approach uses different thresholds for each indicator
 [indicator.coretweet.thresholds]
 weight = 0.80
 [indicator.cohashtag.thresholds]
@@ -89,11 +90,13 @@ shouldAggregate = true
 
 ["community"]
 detectCommunity = true
-computeCommunityLabels = true
+computeCommunityLabels = false
+# Enable for computing the summarized labels of the communities
 
 ["output"]
 thresholdAttribute = "similarity"
 thresholds = [0]
+# For union, thresholds should be [0] (no threshold)
 
 # Specific extra thresholds for the output
 # based on other features
