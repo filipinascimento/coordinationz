@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 import coordinationz as cz
 import xnetwork as xn
 import coordinationz.experiment_utilities as czexp
-import networkx as nx
+
 
 if __name__ == "__main__": # Needed for parallel processing
     config = cz.config
@@ -19,7 +19,7 @@ if __name__ == "__main__": # Needed for parallel processing
     dataName = "cuba_082020_tweets"
 
     # Loads data from the evaluation datasets as pandas dataframes
-    dfIO = czexp.loadIODataset(dataName, config=config, flavor="io", minActivities=10)
+    dfIO = czexp.loadIODataset(dataName, config=config, flavor="both", minActivities=10)
 
     # Create a bipartite graph from the retweet data
     bipartiteEdges = czexp.obtainIOBipartiteEdgesRetweets(dfIO)
@@ -43,3 +43,12 @@ if __name__ == "__main__": # Needed for parallel processing
 
     xn.save(g, networksPath/f"{dataName}_coretweet.xnet")
 
+import matplotlib.pyplot as plt
+# plot nullModelOutput["similarities"] vs nullModelOutput["pvalues"]
+fig, ax = plt.subplots()
+ax.scatter(nullModelOutput["similarities"], nullModelOutput["pvalues"])
+ax.set_xlabel("Similarity")
+ax.set_ylabel("P-value")
+
+plt.savefig(Path("Data")/"Figures"/f"{dataName}_similarity_vs_pvalue.png")
+plt.close()

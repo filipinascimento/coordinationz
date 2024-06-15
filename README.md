@@ -94,3 +94,29 @@ The text similarity indicators can be run by including `usctextsimilarity`, `tex
 
 ## Run for IO datasets
 Repeat the same steps as for INCAS datasets, but set the `IO_DATASETS` variable in the config.toml file to the location of the IO datasets. Also, for preprocessing, use the `pipeline/preprocess/preprocessIO.py` script.
+
+## Submitted methodologies
+To generate the results submmited for the evaluation datasets, use the following procedures:
+
+First preprocess the dataset according to the preprocess instructions above.
+
+### For the UNION approach:
+ - Copy the `config_template_union.toml` to `config_union.toml` and set the PATHS accordingly.
+ - Run the following command:
+```bash
+python pipeline/indicators.py <dataname> -c config_union.toml -i cohashtag coretweet courl coword -s union
+```
+where `<dataname>` is the filename of the dataset (for the evaluation dataset it should be `TA2_full_eval_NO_GT_nat_2024-06-03` or `TA2_full_eval_NO_GT_nat+synth_2024-06-03`).
+ - The results will be stored in the `Outputs/Tables` (or the folder defined in the config file).
+
+### For the SOFTUNION approach:
+ - Copy the `config_template_softunion.toml` to `config_softunion.toml` and set the PATHS accordingly.
+ - Run the following command:
+```bash
+python pipeline/indicators.py <dataname> -c config_softunion.toml -i cohashtag coretweet courl coword -s softunion
+```
+where `<dataname>` is the filename of the dataset (for the evaluation dataset it should be `TA2_full_eval_NO_GT_nat_2024-06-03` or `TA2_full_eval_NO_GT_nat+synth_2024-06-03`).
+ - The results will be stored in the `Outputs/Tables` (or the folder defined in the config file).
+
+
+

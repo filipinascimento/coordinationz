@@ -18,9 +18,11 @@ from collections import Counter
 
 dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
 networkType = "merged"
-suffix = "all"
-thresholdAttribute = "quantile"
-threshold = 0.9995
+# suffix = "all_coword_min0.2_v5"
+suffix = "all_union_coword_0.8_0.85"
+scoresAttribute = "weight" # UNION
+# scoreAttribute = "quantile" # SOFT
+threshold = 0
 configPath = None
 
 if(configPath is not None):
@@ -35,7 +37,7 @@ else:
     # print("------")
 
 networksPath = Path(config["paths"]["NETWORKS"]).resolve()
-networkPath = networksPath/f"{dataName}_{suffix}_{networkType}_thres_{thresholdAttribute}_{threshold}.xnet"
+networkPath = networksPath/f"{dataName}_{suffix}_{networkType}_{threshold}.xnet"
 
 df = czpre.loadPreprocessedData(dataName, config=config)
 
@@ -44,11 +46,12 @@ g = xn.load(networkPath)
 # get top 20 edges by quantile
 topEdges = []
 labels = g.vs["Label"]
-scores = g.es["quantile"]
 if("similarity" in g.es.attributes()):
     similarities = np.array(g.es["similarity"])
 elif("weight" in g.es.attributes()):
     similarities = np.array(g.es["weight"])
+
+scores = g.es[scoresAttribute]
 
 # plot similarity vs score
 # import matplotlib.pyplot as plt
@@ -108,6 +111,7 @@ if("Type" in g.es.attributes()):
 else:
     edgeTypes = [networkType] * len(allEdges)
 
+topEdges = []
 for edgeIndex in topEdgeIndices:
     edge = allEdges[edgeIndex]
     score = scores[edgeIndex]
@@ -124,20 +128,26 @@ for attribute in g.vs.attributes():
         user2CommunityDescriptions[attribute] = {user:community for user,community in zip(g.vs["Label"],g.vs[attribute])}
 
 
-def printEdge(edge):
+def printEdge(edge,file=sys.stdout):
     user1 = edge[0]
     user2 = edge[1]
     score = edge[2]
-    community1 = user2Community[user1]
-    community2 = user2Community[user2]
+    if(user1 in user2Community):
+        community1 = user2Community[user1]
+    else:
+        community1 = "None"
+    if(user2 in user2Community):
+        community2 = user2Community[user2]
+    else:
+        community2 = "None"
     edgeType = edge[3]
     similarity = edge[4]
-    print(f"{user1} - {user2}")
-    print(f"({edgeType}) : {score} (sim. {similarity})")
-    print("Communities: ", community1, community2)
-    print("Community descriptions:")
-    for attribute, user2description in user2CommunityDescriptions.items():
-        print(f"\t{attribute}:\n\t\tuser1: {user2description[user1]}\n\t\tuser2:{user2description[user2]}")
+    file.write(f"{user1} - {user2}"+"\n")
+    file.write(f"({edgeType}) : {score} (sim. {similarity})"+"\n")
+    file.write("Communities: "+str(community1)+" "+str(community2)+"\n")
+    # file.write("Community descriptions:")
+    # for attribute, user2description in user2CommunityDescriptions.items():
+    #     file.write(f"\t{attribute}:\n\t\tuser1: {user2description[user1]}\n\t\tuser2:{user2description[user2]}")
 
     # [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     # pandas has user_id, tweet_type, hashtags, urls, text
@@ -159,29 +169,31 @@ def printEdge(edge):
     linkedIDs1 = Counter(linkedIDsList1)
     linkedIDs2 = Counter(linkedIDsList2)
     # calculate cosine similarity between two users via retweet
-    # numerator = sum([linkedIDs1[linkedID] * linkedIDs2[linkedID] for linkedID in linkedIDs1.keys() if linkedID in linkedIDs2.keys()])
-    # denominator = np.sqrt(sum([linkedIDs1[linkedID]**2 for linkedID in linkedIDs1.keys()]) * sum([linkedIDs2[linkedID]**2 for linkedID in linkedIDs2.keys()]))
-    # cosineSimilarity = numerator / denominator
-    # print("\t Retweet cosine similarity:", cosineSimilarity)
+    numerator = sum([linkedIDs1[linkedID] * linkedIDs2[linkedID] for linkedID in linkedIDs1.keys() if linkedID in linkedIDs2.keys()])
+    denominator = np.sqrt(sum([linkedIDs1[linkedID]**2 for linkedID in linkedIDs1.keys()]) * sum([linkedIDs2[linkedID]**2 for linkedID in linkedIDs2.keys()]))
+    cosineSimilarity = numerator / denominator
+    file.write("\t Retweet cosine similarity: "+str(cosineSimilarity)+"\n")
     urlsLists1 = user1Data[user1Data.tweet_type!="retweet"]["urls"].values
     urlsLists2 = user2Data[user2Data.tweet_type!="retweet"]["urls"].values
 
     urls1 = Counter([url for urlsList in urlsLists1 for url in urlsList])
     urls2 = Counter([url for urlsList in urlsLists2 for url in urlsList])
 
-    print("\t Hashtags:")
-    print("\t\t User 1:", [entry for entry,_ in hashtags1.most_common()])
-    print("\t\t User 2:", [entry for entry,_ in hashtags2.most_common()])
-    print("\t URLs:")
-    print("\t\t User 1:", [f"{entry}:{counts}" for entry,counts in urls1.most_common()])
-    print("\t\t User 2:", [f"{entry}:{counts}" for entry,counts in urls2.most_common()])
+    file.write("\t Hashtags:"+"\n")
+    file.write("\t\t User 1: "+str([f"{entry}:{count}" for entry,count in hashtags1.most_common()])+"\n")
+    file.write("\t\t User 2: "+str([f"{entry}:{count}" for entry,count in hashtags2.most_common()])+"\n")
+    file.write("\t URLs:"+"\n")
+    file.write("\t\t User 1: "+str([f"{entry}:{counts}" for entry,counts in urls1.most_common()])+"\n")
+    file.write("\t\t User 2: "+str([f"{entry}:{counts}" for entry,counts in urls2.most_common()])+"\n")
     # two columns for text, one for each user
     # concatenate text and creation_date as text (creation_date)
-    textDate1 = user1Data["text"] + " (" + user1Data["creation_date"] + ")"
-    textDate2 = user2Data["text"] + " (" + user2Data["creation_date"] + ")"
+    user1ParendIDs = user1Data["linked_tweet"].replace(np.nan, "None")
+    user2ParendIDs = user2Data["linked_tweet"].replace(np.nan, "None") 
+    textDate1 = user1Data["text"] + " (" + user1Data["creation_date"] + ") -- " + user1ParendIDs
+    textDate2 = user2Data["text"] + " (" + user2Data["creation_date"] + ") -- " + user2ParendIDs
     text1 = sorted(textDate1.values)
     text2 = sorted(textDate2.values)
-    print("\t Text: \n\tUser1:")
+    file.write("\t Text: \n\tUser1:"+"\n")
     for text in text1:
         # print("\t\t", text)
         # break text into lines and add padding
@@ -195,8 +207,8 @@ def printEdge(edge):
             line += word + " "
         lines.append(line)
         for line in lines:
-            print("\t\t ", line)
-    print("\tUser2:")
+            file.write("\t\t "+line+"\n")
+    file.write("\tUser2:\n")
     # print("\t\t", text2)
     for text in text2:
         # break text into lines and add padding
@@ -210,7 +222,7 @@ def printEdge(edge):
             line += word + " "
         lines.append(line)
         for line in lines:
-            print("\t\t ", line)
+            file.write("\t\t "+line+"\n")
 
 # print similarity of the top 10 edges
 # print("Top 10 edges:")
@@ -226,6 +238,37 @@ print("Community filtered edges:")
 print(Counter([edge[3] for edge in topEdgesFiltered]))
 printEdge(topEdgesFiltered[0])
 
+
+selectedCommunityIndex = 6
+topEdgesFiltered = [edges for edges in topEdges if user2Community[edges[0]] != selectedCommunityIndex and user2Community[edges[1]] != selectedCommunityIndex]
+printEdge(topEdgesFiltered[0])
+# 
+findEdge = ("af5c7bfe2c638ee0af8ba1dbe18060272d924a8848013d64205d1438cc3d66b2" , "e4e6dfc75e2912a8aba8a1614322b994ba1df858348bfa907b6d66e3a8355e70")
+# find edge in topEdges
+edgeTest = None
+for edge in topEdges:
+    if edge[0] == findEdge[0] and edge[1] == findEdge[1]:
+        edgeTest = edge
+        break
+    if edge[0] == findEdge[1] and edge[1] == findEdge[0]:
+        edgeTest = edge
+        break
+if(edgeTest is None):
+    edgeTest = (findEdge[0], findEdge[1], 0.0, "None", 0.0)
+
+with open(f"Outputs/Tables/{dataName}_{suffix}_{networkType}_edgeTest.txt", "w") as file:
+    # printEdge(edgeTest, file=file)
+    printEdge(topEdgesFiltered[3],file)
+
+
+
+printEdge(topEdges[0])
+
+# user2Community = {user:int(community) for user,community in zip(g.vs["Label"],g.vs["CommunityIndex"])}
+# topEdgesFilteredSynth = [edges for edges in topEdges if user2Community[edges[0]] == selectedCommunityIndex and user2Community[edges[1]] == selectedCommunityIndex]
+# print("Synthetic filtered edges:")
+# print(Counter([edge[3] for edge in topEdgesFiltered]))
+# printEdge(topEdgesFiltered[0])
 
 # create dictionary of user (user_id) to all retweets as list (linked_tweet) 
 user2retweetSets = {}
