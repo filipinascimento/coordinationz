@@ -509,9 +509,9 @@ def mergeNetworks(networksDictionary,
             combineEdges["zscore"] = combineMethod
         if("pvalue" in mergedNetwork.es.attributes()):
             # use product of (1-pvalue)
-            pvalueTransformed = 1-np.array(mergedNetwork.es["pvalue"])
-            mergedNetwork.es["1-pvalue"] = pvalueTransformed
-            combineEdges["1-pvalue"] = combineMethodProbabilistic
+            # pvalueTransformed = 1-np.array(mergedNetwork.es["pvalue"])
+            # mergedNetwork.es["pvalue"] = pvalueTransformed
+            combineEdges["pvalue"] = combineMethodProbabilistic
         if("quantile" in mergedNetwork.es.attributes()):
             quantileTransformed = 1-np.array(mergedNetwork.es["quantile"])
             mergedNetwork.es["1-quantile"] = quantileTransformed
@@ -526,6 +526,8 @@ def mergeNetworks(networksDictionary,
         # print("--------")
         # print(f"Using {weightAttribute} as the weight attribute")
         # print("--------")
+        if(weightAttribute == "1-pvalue"):
+            mergedNetwork.es["weight"] = 1-np.array(mergedNetwork.es["pvalue"])
         if(weightAttribute in mergedNetwork.es.attributes()):
             mergedNetwork.es["weight"] = np.nan_to_num(mergedNetwork.es[weightAttribute], nan=0.0)
     mask = np.ones(mergedNetwork.ecount(),dtype=bool)
