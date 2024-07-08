@@ -16,13 +16,13 @@ import shutil
 import json
 from collections import Counter
 
-dataName = "TA2_full_eval_NO_GT_nat+synth_2024-06-03"
+dataName = "TA2_full_eval_NO_GT_nat_2024-06-03"
 networkType = "merged"
-# suffix = "all_coword_min0.2_v5"
-suffix = "all_union_coword_0.8_0.85"
-scoresAttribute = "weight" # UNION
-# scoreAttribute = "quantile" # SOFT
-threshold = 0
+suffix = "all_coword_min0.5_v5"
+# suffix = "all_union_coword_0.8_0.85"
+# scoresAttribute = "weight" # UNION
+scoresAttribute = "quantile" # SOFT
+threshold = 0.95
 configPath = None
 
 if(configPath is not None):
@@ -39,9 +39,10 @@ else:
 networksPath = Path(config["paths"]["NETWORKS"]).resolve()
 networkPath = networksPath/f"{dataName}_{suffix}_{networkType}_{threshold}.xnet"
 
+g = xn.load(networkPath)
+
 df = czpre.loadPreprocessedData(dataName, config=config)
 
-g = xn.load(networkPath)
 
 # get top 20 edges by quantile
 topEdges = []
@@ -127,6 +128,9 @@ for attribute in g.vs.attributes():
     if(attribute.startswith("Surprising")):
         user2CommunityDescriptions[attribute] = {user:community for user,community in zip(g.vs["Label"],g.vs[attribute])}
 
+user2Synthetic = {}
+if "Synthetic" in g.vs.attributes():
+    user2Synthetic = {user:synthetic for user,synthetic in zip(g.vs["Label"],g.vs["Synthetic"])}
 
 def printEdge(edge,file=sys.stdout):
     user1 = edge[0]
@@ -145,9 +149,10 @@ def printEdge(edge,file=sys.stdout):
     file.write(f"{user1} - {user2}"+"\n")
     file.write(f"({edgeType}) : {score} (sim. {similarity})"+"\n")
     file.write("Communities: "+str(community1)+" "+str(community2)+"\n")
-    # file.write("Community descriptions:")
-    # for attribute, user2description in user2CommunityDescriptions.items():
-    #     file.write(f"\t{attribute}:\n\t\tuser1: {user2description[user1]}\n\t\tuser2:{user2description[user2]}")
+    file.write("Synthetic: "+str(user2Synthetic.get(user1,"None"))+" "+str(user2Synthetic.get(user2,"None"))+"\n")
+    file.write("Community descriptions:\n")
+    for attribute, user2description in user2CommunityDescriptions.items():
+        file.write(f"\t{attribute}:\n\t\tuser1: {user2description[user1]}\n\t\tuser2:{user2description[user2]}")
 
     # [(user,hashtag) for user,hashtag_list in zip(users,hashtags) for hashtag in hashtag_list]
     # pandas has user_id, tweet_type, hashtags, urls, text
@@ -260,6 +265,10 @@ with open(f"Outputs/Tables/{dataName}_{suffix}_{networkType}_edgeTest.txt", "w")
     # printEdge(edgeTest, file=file)
     printEdge(topEdgesFiltered[3],file)
 
+
+with open(f"Outputs/Tables/{dataName}_{suffix}_{networkType}_edgeTest.txt", "w") as file:
+    # printEdge(edgeTest, file=file)
+    printEdge(topEdges[-100],file)
 
 
 printEdge(topEdges[0])
