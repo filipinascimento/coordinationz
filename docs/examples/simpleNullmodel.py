@@ -6,11 +6,11 @@ import coordinationz.experiment_utilities as czexp
 import numpy as np
 
 if __name__ == "__main__": # Needed for parallel processing
-    config = cz.config
+    # config = cz.config
     # config = cz.load_config("<path to config>")
 
-    networksPath = Path(config["paths"]["NETWORKS"]).resolve()
-    networksPath.mkdir(parents=True, exist_ok=True)
+    # networksPath = Path(config["paths"]["NETWORKS"]).resolve()
+    # networksPath.mkdir(parents=True, exist_ok=True)
 
     bipartiteEdges =[
         # e.g., user, hashtag or user, coretweet_id,
@@ -128,5 +128,5 @@ if __name__ == "__main__": # Needed for parallel processing
     )
 
     # Save the network
-    xn.save(g, networksPath/f"sample_network.xnet")
+    xn.save(g, f"sample_network.xnet")
 
