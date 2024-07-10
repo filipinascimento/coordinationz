@@ -78,9 +78,12 @@ np_dep = declare_dependency(include_directories: inc_np, compile_args: numpy_nod
 dependencies = []
 dependencies += [np_dep]
 
-omp_dep = dependency('openmp')
 
-if omp_dep.found()
+host_system = host_machine.system()
+
+# Conditional configurations based on host system
+if host_system == 'darwin'
+    omp_dep = dependency('openmp')
     dependencies += [omp_dep]
 endif
 
