@@ -88,7 +88,7 @@ py3_extension = py3.extension_module(
     sources: c_sources,
     install: true,
     subdir: 'coordinationz',
-    dependencies: [np_dep],
+    dependencies: dependencies,
     # include_directories: inc_dirs
 )
 
