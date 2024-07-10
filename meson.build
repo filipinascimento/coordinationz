@@ -3,7 +3,7 @@
 project('coordinationz',
         'c',
         default_options : [
-                'c_std=c11',
+                # 'c_std=c11',
                 'warning_level=3',
                 # 'b_ndebug=true',
                 'optimization=3'
@@ -24,10 +24,10 @@ if host_system == 'darwin'
         extra_options += ['-DOSX']
         extra_options += ['-DCV_USE_LIBDISPATCH=1', '-Xpreprocessor', '-fblocks', '-lBlocksRuntime','-std=c11']
 elif host_system == 'windows'
-        extra_options += ['-DWIN32', '-D__WIN32__']
-        extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp','-std=c11']
-        # extra_options += ['/DWIN32', '/D__WIN32__']
-        # extra_options += ['/DCV_USE_OPENMP=1', '/openmp']
+        # extra_options += ['-DWIN32', '-D__WIN32__']
+        # extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp','-std=c11']
+        extra_options += ['/DWIN32', '/D__WIN32__']
+        extra_options += ['/DCV_USE_OPENMP=1', '/openmp','/std:c11']
 else
         extra_options += ['-DLinux', '-D_GNU_SOURCE=1']
         extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp','-std=c11']

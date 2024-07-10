@@ -58,3 +58,5 @@ number = 4
 recursive = true
 targets = "coordinationz"
 
+[tool.meson-python.args]
+setup = ['--vsenv']
