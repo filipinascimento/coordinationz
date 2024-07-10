@@ -82,7 +82,7 @@ dependencies += [np_dep]
 host_system = host_machine.system()
 
 # Conditional configurations based on host system
-if host_system == 'darwin'
+if host_system != 'darwin'
     omp_dep = dependency('openmp')
     dependencies += [omp_dep]
 endif
