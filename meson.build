@@ -24,8 +24,10 @@ if host_system == 'darwin'
         extra_options += ['-DOSX']
         extra_options += ['-DCV_USE_LIBDISPATCH=1', '-Xpreprocessor', '-fblocks', '-lBlocksRuntime']
 elif host_system == 'windows'
-        extra_options += ['/DWIN32', '/D__WIN32__']
-        extra_options += ['/DCV_USE_OPENMP=1', '/openmp']
+        extra_options += ['-DWIN32', '-D__WIN32__']
+        extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp']
+        # extra_options += ['/DWIN32', '/D__WIN32__']
+        # extra_options += ['/DCV_USE_OPENMP=1', '/openmp']
 else
         extra_options += ['-DLinux', '-D_GNU_SOURCE=1']
         extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp']
