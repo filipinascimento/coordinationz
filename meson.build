@@ -28,7 +28,7 @@ elif host_system == 'windows'
         extra_options += ['/DCV_USE_OPENMP=1', '/openmp']
 else
         extra_options += ['-DLinux', '-D_GNU_SOURCE=1']
-        extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp','-O3']
+        extra_options += ['-DCV_USE_OPENMP=1', '-fopenmp']
 endif
 
 # Apply extra compiler options
