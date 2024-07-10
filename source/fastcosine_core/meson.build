@@ -82,6 +82,7 @@ omp_dep = dependency('openmp')
 
 if omp_dep.found()
     dependencies += [omp_dep]
+endif
 
 py3_extension = py3.extension_module(
     'fastcosine_core', 
