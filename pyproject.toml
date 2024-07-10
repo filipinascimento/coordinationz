@@ -2,7 +2,7 @@
 build-backend = 'mesonpy'
 requires = [
     'meson-python',
-    "oldest-supported-numpy",
+    "numpy>=2.0",
     ]
 
 [project]
