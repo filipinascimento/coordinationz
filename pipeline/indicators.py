@@ -27,7 +27,7 @@ import pickle
 
 if __name__ == "__main__": # Needed for parallel processing
 
-    dataName = "sampled_20240226"
+    dataName = "hamas_israel_challenge_problem_all_20240229"
     indicators = ["coretweet","cohashtag","courl","coretweetusers"]
     tweetIDTextCache = {}
     dataNameHelp = """Name of the dataset. A file named <dataName>.csv should be in the preprocessed datasets folder.
@@ -196,9 +196,9 @@ if __name__ == "__main__": # Needed for parallel processing
         if("community" in runParameters and runParameters["community"]["detectCommunity"]):
             print(f"Finding communities in the {networkName} network...")
             gCommunities = czcom.getNetworksWithCommunities(gThresholded.copy()) #**runParameters["communities"][networkName]
-            if(runParameters["community"]["computeCommunityLabels"]):
-                print(f"Computing community labels for the {networkName} network...")
-                gCommunities = czcom.labelCommunities(df,gCommunities,tweetIDTextCache)
+            # if(runParameters["community"]["computeCommunityLabels"]):
+            #     print(f"Computing community labels for the {networkName} network...")
+            #     gCommunities = czcom.labelCommunities(df,gCommunities,tweetIDTextCache)
             xn.save(gCommunities, networksPath/f"{dataName}_{suffix}_{networkName}_community.xnet")
     
     print(f"Merging networks...")

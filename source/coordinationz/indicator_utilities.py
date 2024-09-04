@@ -769,3 +769,4 @@ def suspiciousTables(df,mergedNetwork,
 
         outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
     return outputs
+
