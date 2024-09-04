@@ -248,6 +248,8 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
             # hashtags, 
             # mentioned_users
 
+
+
             remapAttributes = {
                 "tweet_id": "tweet_id", # string
                 # "screen_name": "user_id", # string
@@ -265,6 +267,13 @@ def preprocessINCASData(inputFilePath, preprocessedFilePath):
             remapAttributes = {f"data_{k}": f"{v}" for k, v in remapAttributes.items()}
             df = df.rename(columns=remapAttributes)
             
+            # from the Text get the first mention when it is a retweet
+            # eg RT @ICJPalestine -> ICJPalestine
+            # mask using tweet_type == retweet
+            df["linked_tweet_user_id"] = ""
+            retweetMask = (df.tweet_type == "retweet")
+            df.loc[retweetMask, "linked_tweet_user_id"] = df[retweetMask].text.str.extract(r'RT @(\w+)', expand=False)
+
             # calculate 
             hashtags = df["text"].str.lower().str.findall(r"#\w+")
             df["hashtags"] = hashtags
@@ -317,7 +326,7 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
         "tweet_text": "text", # string
         "created_at": "created_at", # datetime
         "linked_tweet": "linked_tweet", #retweet/quote/etc/ #string
-        "linked_tweet_userid": "linked_tweet_user_id", #string
+        "linked_tweet_user_id": "linked_tweet_user_id", #string
         "urls": "urls", #list of strings
         "hashtags": "hashtags", #list of strings
         "mentions": "mentioned_users", #list of strings
