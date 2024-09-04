@@ -2,14 +2,19 @@
 build-backend = 'mesonpy'
 requires = [
     'meson-python',
-    "oldest-supported-numpy",
+    'numpy>1.24.0; python_version < "3.9"',
+    'numpy>=2.0.0; python_version >= "3.9"'
     ]
 
 [project]
 name =  "coordinationz"
 authors = [
     {name = "Filipi N. Silva", email = "filipinascimento@gmail.com"},
-    # other authors Manita, David, Lake, etc
+    {name = "Manita Pote", email = "potem@iu.edu"},
+    {name = "Lake Yin", email = "lakeyin@iu.edu"},
+    {name = "David Axelrod", email = "daaxelro@iu.edu"},
+    {name = "Luca Luceri", email = "lluceri@isi.edu"},
+    {name = "Ashwin Balasubramanian", email="ashwinb@isi.edu"}
 ]
 description = "Package to create networks for detecting coordination in social media."
 readme = "README.md"
@@ -53,3 +58,5 @@ number = 4
 recursive = true
 targets = "coordinationz"
 
+[tool.meson-python.args]
+setup = ['--vsenv']
