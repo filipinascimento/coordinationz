@@ -56,10 +56,10 @@ def obtainBipartiteEdgesRetweets(df):
 def obtainBipartiteEdgesRetweetsUsers(df):
     # keep only tweet_type == "retweet"
     # if linked_tweet or tweet_type or user_id are not in the dataframe, return an empty list
-    if "linked_tweet_userid" not in df or "tweet_type" not in df or "user_id" not in df:
+    if "linked_tweet_user_id" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
     df = df[df["tweet_type"] == "retweet"]
-    bipartiteEdges = df[["user_id","linked_tweet_userid"]].values
+    bipartiteEdges = df[["user_id","linked_tweet_user_id"]].values
     return bipartiteEdges
 
 
@@ -143,6 +143,10 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
 
     # Cleaning text
     text = re.sub(r'https?://\S+|www\.\S+', " ", text)  # Remove URL
+    # also filter urls that do not start with https:// or http://
+    # anything that is recognized as a url
+    
+
     text = re.sub(r'@\w+', ' ', text)  # Remove mentions
     text = re.sub(r'\d+', ' ', text)  # Remove digits
     text = re.sub(r'<.*?>', ' ', text)  # Remove HTML tags
@@ -164,7 +168,8 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
 def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeReplies=False, ngramSize = 1):
     if "text" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
-    
+    # drop all rows with missing text
+    df = df.dropna(subset=["text"])
     if(removeRetweets):
         df = df[df["tweet_type"] != "retweet"]
     if(removeQuotes):
