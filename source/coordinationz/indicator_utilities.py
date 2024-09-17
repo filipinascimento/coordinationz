@@ -329,7 +329,6 @@ def parseParameters(config,indicators):
 
     networkParametersMap = {
         "similarityThreshold":("similarityThreshold",0.0),
-        "zscoreThreshold":("zscoreThreshold",0.0),
         "pvalueThreshold":("pvalueThreshold",1.0),
     }
 
@@ -350,9 +349,8 @@ def parseParameters(config,indicators):
         specificNetworkOptions[indicator] = {**generalNetworkOptions, **specificConfig}
 
     nullModelOptions = {
-        "scoreType": ("scoreType",["zscore","pvalue-quantized"]),
+        "scoreType": ("scoreType",["pvalue"]),
         "realizations":("realizations",10000),
-        "pvaluesQuantized":("pvaluesQuantized",None),
         "idf":("idf","smoothlog"), # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         "minSimilarity":("minSimilarity",0.1),
         "batchSize":("batchSize",10),
@@ -381,13 +379,11 @@ def parseParameters(config,indicators):
         # weightAttribute = "similarity"
         # quantileThreshold = 0.0
         # pvalueThreshold = 1.0
-        # zscoreThreshold = 0.0
         # similarityThreshold = 0.0
         "shouldAggregate": ("shouldAggregate",True),
         "weightAttribute": ("weightAttribute","similarity"),
         "quantileThreshold": ("quantileThreshold",0.0),
         "pvalueThreshold": ("pvalueThreshold",1.0),
-        "zscoreThreshold": ("zscoreThreshold",0.0),
         "similarityThreshold": ("similarityThreshold",0.0),
     }
 
@@ -451,7 +447,6 @@ def mergeNetworks(networksDictionary,
                   weightAttribute="similarity",
                   quantileThreshold=0.0,
                   pvalueThreshold=1.0,
-                  zscoreThreshold=0.0,
                   similarityThreshold=0.0):
     # merge the networks via property Label
     label2Index = {}
@@ -510,8 +505,6 @@ def mergeNetworks(networksDictionary,
         combineEdges = {}
         if("similarity" in mergedNetwork.es.attributes()):
             combineEdges["similarity"] = combineMethod
-        if("zscore" in mergedNetwork.es.attributes()):
-            combineEdges["zscore"] = combineMethod
         if("pvalue" in mergedNetwork.es.attributes()):
             # use product of (1-pvalue)
             # pvalueTransformed = 1-np.array(mergedNetwork.es["pvalue"])
@@ -538,8 +531,6 @@ def mergeNetworks(networksDictionary,
     mask = np.ones(mergedNetwork.ecount(),dtype=bool)
     if(similarityThreshold > 0.0):
         mask &= np.array(mergedNetwork.es["similarity"]) > similarityThreshold
-    if(zscoreThreshold > 0.0):
-        mask &= np.array(mergedNetwork.es["zscore"]) > zscoreThreshold
     if(pvalueThreshold < 1.0):
         mask &= np.array(mergedNetwork.es["pvalue"]) < pvalueThreshold
     if(quantileThreshold > 0.0):

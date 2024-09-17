@@ -16,8 +16,7 @@ CONFIGS = "Outputs/Configs"
 # General settings for the null model
 [nullmodel]
 realizations = 0 # No nullmodel
-scoreType = ["quantile"] # pvalue-quantized, pvalue, or zscore, 
-pvaluesQuantized = [0.00001,0.00002,0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,0.02,0.05,0.1,0.25,0.5]
+scoreType = ["quantile"] # pvalue
 batchSize = 10
 idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
 workers = -1 # Number of parallel workers. If -1, all the available cores will be used

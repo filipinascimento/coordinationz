@@ -234,9 +234,9 @@ def save_edge_attributes(gml_graph, filename):
     '''
     all_data = []
     for u, v, attrs in G.edges(data=True):
-        all_data.append([attrs['weight'], attrs['pvalue'], attrs['zscore']])
+        all_data.append([attrs['weight'], attrs['pvalue']])
 
     (pd.DataFrame(data=all_data,
-                  columns=['weight', 'pvalue', 'zscore']
+                  columns=['weight', 'pvalue']
                  )
     ).to_pickle(filename)
