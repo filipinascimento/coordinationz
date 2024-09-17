@@ -51,8 +51,7 @@ if __name__ == "__main__": # Needed for parallel processing
     # creates a null model output from the bipartite graph
     nullModelOutputJustSimilarities = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
-        scoreType=["zscore","pvalue"], # pvalue-quantized, pvalue, or zscore, 
-        pvaluesQuantized=[0.0001,0.0005,0.001,0.005,0.01,0.05,0.1,0.5],
+        scoreType=["pvalue"], # pvalue, 
         realizations=0,
         batchSize=10,
         idf="smoothlog", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
@@ -64,7 +63,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
     # onlyNullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
     #     bipartiteEdges,
-    #     scoreType="onlynullmodel", # pvalue-quantized, pvalue, or zscore, 
+    #     scoreType="onlynullmodel", pvalue, 
     #     realizations=1000,
     #     batchSize=10,
     #     idf="none", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
@@ -76,7 +75,6 @@ if __name__ == "__main__": # Needed for parallel processing
     # # Create a network from the null model output with a pvalue threshold of 0.05
     # g = cz.network.createNetworkFromNullModelOutput(
     #     nullModelOutput,
-    #     # useZscoreWeights = True,
     #     # usePValueWeights = True,
     #     pvalueThreshold=0.01, # only keep edges with pvalue < 0.05
     # )

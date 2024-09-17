@@ -7,10 +7,8 @@ def dummyTQDM(*args, **kwargs):
 
 def createNetworkFromNullModelOutput(nullModelOutput,
                                      similarityThreshold = 0.0,
-                                     zscoreThreshold = 0.0,
                                      pvalueThreshold = 1.0,
                                      quantileThreshold = 0.0,
-                                     useZscoreWeights = False,
                                      usePValueWeights = False,
                                      useQuantileWeights = False,
                                      showProgress = True):
@@ -23,8 +21,6 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         The null model output dictionary
     similarityThreshold: float
         The similarity threshold to use for the network
-    zscoreThreshold: float
-        The zscore threshold to use for the network
     pvalueThreshold: float
         The pvalue threshold to use for the network
     showProgress: bool
@@ -60,11 +56,6 @@ def createNetworkFromNullModelOutput(nullModelOutput,
     
     edgeAttributes = {}
     edgeAttributes["weight"] = np.array(nullModelOutput["similarities"])
-
-    if("zscore" in nullModelOutput and useZscoreWeights):
-        edgeAttributes["weight"] = np.array(nullModelOutput["zscores"])
-        # filter nans and set infs to 10
-        edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["weight"], nan=0.0, posinf=10.0, neginf=-10.0)
     
     if("pvalues" in nullModelOutput and usePValueWeights):
         edgeAttributes["weight"] = 1.0-np.array(nullModelOutput["pvalues"])
@@ -75,8 +66,6 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["quantiles"], nan=0.0, posinf=1.0, neginf=0.0)
 
 
-    if("zscores" in nullModelOutput):
-        edgeAttributes["zscore"] = np.array(nullModelOutput["zscores"])
     if("pvalues" in nullModelOutput):
         edgeAttributes["pvalue"] = np.array(nullModelOutput["pvalues"])
     if("quantiles" in nullModelOutput):
@@ -88,25 +77,17 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         progressbar.update(1)
         progressbar.set_description("Applying similarity filters")
     
-    if(similarityThreshold > 0.0 or zscoreThreshold > 0.0 or pvalueThreshold < 1.0):
+    if(similarityThreshold > 0.0 or pvalueThreshold < 1.0):
         edgesMask = np.ones(len(edges), dtype=bool)
         if(similarityThreshold > 0.0):
             edgesMask *= edgeAttributes["weight"] > similarityThreshold
-        if(zscoreThreshold > 0.0 and "zscores" in nullModelOutput):
-            edgesMask *= edgeAttributes["zscore"] > zscoreThreshold
         if(pvalueThreshold < 1.0 and "pvalues" in nullModelOutput):
-            # if quantized, use <=, otherwise use <
-            if(nullModelOutput["pvaluesQuantized"]):
-                edgesMask *= edgeAttributes["pvalue"] <= pvalueThreshold
-            else:
-                edgesMask *= edgeAttributes["pvalue"] < pvalueThreshold
+            edgesMask *= edgeAttributes["pvalue"] < pvalueThreshold
         if(quantileThreshold > 0.0 and "quantiles" in nullModelOutput):
             edgesMask *= edgeAttributes["quantile"] > quantileThreshold
 
         edges = edges[edgesMask, :]
         edgeAttributes["weight"] = edgeAttributes["weight"][edgesMask]
-        if("zscores" in nullModelOutput):
-            edgeAttributes["zscore"] = edgeAttributes["zscore"][edgesMask]
         if("pvalues" in nullModelOutput):
             edgeAttributes["pvalue"] = edgeAttributes["pvalue"][edgesMask]
         if("quantiles" in nullModelOutput):
