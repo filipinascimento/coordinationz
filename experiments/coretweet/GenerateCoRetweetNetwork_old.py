@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # results2 = bipartiteCosineSimilarityMatrixThresholded(decodedEdges, leftCount=leftCount, rightCount=rightCount, threshold=0.1)
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         edges,
-        scoreType="pvalue-quantized",
+        scoreType="pvalue",
         realizations=1000,
         batchSize=1,
         workers=-1,

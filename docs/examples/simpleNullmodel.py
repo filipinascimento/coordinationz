@@ -29,47 +29,46 @@ if __name__ == "__main__": # Needed for parallel processing
         ("userC", "c"),
         ("userC", "d"),
         ("userC", "f"),
-        ("userC", "f"),
-        ("userC", "f"),
-        
-        ("userD", "c"),
-        ("userD", "d"),
-        ("userD", "g"),
-        ("userD", "h"),
 
-        ("userE", "c"),
-        ("userE", "d"),
-        ("userE", "g"),
-        ("userE", "i"),
+        ("userD", "i"),
+        ("userD", "j"),
+        ("userD", "k"),
+        ("userD", "l"),
+
+        ("userE", "m"),
+        ("userE", "n"),
+        ("userE", "k"),
+        ("userE", "l"),
 
         ("userF", "j"),
         ("userF", "k"),
         ("userF", "l"),
-        ("userF", "m"),
+        ("userF", "o"),
 
         ("userG", "j"),
         ("userG", "k"),
         ("userG", "l"),
         ("userG", "o"),
+
+        ("userH", "a"),
+        ("userH", "b"),
+        ("userH", "c"),
+        ("userH", "d"),
+        ("userH", "e"),
     ]
 
-    # scoreType = ["zscore","pvalue"]
-    scoreType = ["zscore","pvalue-quantized"]
-    # pvalue-quantized is faster than pvalue
-    # but pvalues are quantized
+    scoreType = ["pvalue"]
 
     # creates a null model output from the bipartite graph
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
         bipartiteEdges,
         scoreType=scoreType,
-        realizations=10_000, # number of realizations of the null model, use 0 for no null model
+        realizations=1_000_000, # number of realizations of the null model, use 0 for no null model
         batchSize=100, # number of realizations to calculate in each process
         minSimilarity = 0.0, # will first filter out similarities below this value
-        pvaluesQuantized=[0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,0.02,0.05,0.1,0.25,0.5],
-        # for pvalue-quantized, you can define the p-values of interest
         idf="none", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
-        workers=-1, # -1 to use all available cores, 0 or 1 to use a single core
-        returnDegreeSimilarities=True, # will also return the similarities by degree pair
+        workers=10, # -1 to use all available cores, 0 or 1 to use a single core
+        returnDegreeSimilarities=False, # will also return the similarities by degree pair
         returnDegreeValues=True, # will return the degrees of the nodes
     )
 
@@ -84,40 +83,30 @@ if __name__ == "__main__": # Needed for parallel processing
     if("pvalues" in nullModelOutput):
         nullModelPvalues = nullModelOutput["pvalues"]
 
-    nullModelZScores = None
-    # zscores same order as indexedEdges (if zcores was requested)
-    if("zscores" in nullModelOutput):
-        nullModelZScores = nullModelOutput["zscores"]
-
     # labels for the nodes
     labels = nullModelOutput["labels"]
 
-    # Print the indexed edges and their similarities together with pvalues and zscores
-    for i, (edge, similarity) in enumerate(zip(nullModelIndexedEdges[0:5], nullModelSimilarities[0:5])):
+    # Print the indexed edges and their similarities together with pvalues
+    for i, (edge, similarity) in enumerate(zip(nullModelIndexedEdges, nullModelSimilarities)):
         labelledEdge = (labels[edge[0]],labels[edge[1]])
         
         printStringList = []
         printStringList.append(f"{labelledEdge[0]}, {labelledEdge[1]} -> {similarity:.3}")
 
-        if(nullModelPvalues):
+        if(nullModelPvalues is not None):
             pvalue = nullModelPvalues[i]
-            if("pvalue-quantized" in scoreType):
+            if("pvalue" in scoreType):
                 pvalueString = f"(p<{pvalue:.2g})"
-            else:
-                pvalueString = f"(p={pvalue:.2g})"
             printStringList.append(pvalueString)
         
-        if(nullModelZScores):
-            zscore = nullModelZScores[i]
-            zscoreString = f"(z={zscore:.2g})"
-            printStringList.append(zscoreString)
         print(' '.join(printStringList))
     print("")
     
 
 
-    # You can access the similarities
-    degrees2Similarity = nullModelOutput["nullmodelDegreePairsSimilarities"]
+    # You can access the null model similarities
+    if("nullmodelDegreePairsSimilarities" in nullModelOutput):
+        degrees2Similarity = nullModelOutput["nullmodelDegreePairsSimilarities"]
     degrees = nullModelOutput["degrees"]
 
     
