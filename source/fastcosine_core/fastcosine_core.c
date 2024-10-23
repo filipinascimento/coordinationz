@@ -363,7 +363,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 							errorOccured = CVTrue;
 							break;
 						}
-						Py_DECREF(result);
+						Py_XDECREF(result);
 					}
 					// python checks to see if the process is interrupted by error
 					if (PyErr_CheckSignals() != 0) {
@@ -403,8 +403,8 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 						PyObject *key = PyTuple_Pack(2, PyLong_FromLong(i), PyLong_FromLong(j));
 						PyObject *value = PyFloat_FromDouble(similarity);
 						PyDict_SetItem(similaritiesDict, key, value);
-						Py_DECREF(key);
-						Py_DECREF(value);
+						Py_XDECREF(key);
+						Py_XDECREF(value);
 					}else{
 						if (CVUnlikely(similaritiesCount == similaritiesCapacity)) {
 							similaritiesCapacity *= 2;
@@ -437,7 +437,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 							errorOccured = CVTrue;
 							break;
 						}
-						Py_DECREF(result);
+						Py_XDECREF(result);
 					}
 					// python checks to see if the process is interrupted
 					if (PyErr_CheckSignals() != 0) {
@@ -477,8 +477,8 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 						PyObject *key = PyTuple_Pack(2, PyLong_FromLong(i), PyLong_FromLong(j));
 						PyObject *value = PyFloat_FromDouble(similarity);
 						PyDict_SetItem(similaritiesDict, key, value);
-						Py_DECREF(key);
-						Py_DECREF(value);
+						Py_XDECREF(key);
+						Py_XDECREF(value);
 					}else{
 						if (CVUnlikely(similaritiesCount == similaritiesCapacity)) {
 							similaritiesCapacity *= 2;
@@ -525,7 +525,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 		if (result == NULL) {
 			errorOccured = CVTrue;
 		}
-		Py_DECREF(result);
+		Py_XDECREF(result);
 	}
 
 
@@ -563,8 +563,8 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 		
 		// free(aboveThresholdEdges);
 		// free(similarities);
-		Py_DECREF(aboveThresholdEdgesArray);
-		Py_DECREF(similaritiesArray);
+		Py_XDECREF(aboveThresholdEdgesArray);
+		Py_XDECREF(similaritiesArray);
 	}
 	return result;
 	// Py_RETURN_NONE;

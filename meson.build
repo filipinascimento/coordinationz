@@ -6,9 +6,12 @@ project('coordinationz',
                 # 'c_std=c11',
                 'warning_level=3',
                 # 'b_ndebug=true',
-                'optimization=3'
+                # 'debug=true',
+                'optimization=3',         # Enable debug symbols
+                # 'b_sanitize=address',  # Enable AddressSanitizer
+                # 'b_lundef=false',
                 ],
-        version:'0.0.1',
+        version:'0.0.6',
         license:'MIT',
         )
 
