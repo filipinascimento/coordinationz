@@ -100,6 +100,6 @@ def get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=5000, column="t
     # convert to bipartite network
     df = df[["user_id", column]].copy()
     df[column] = df[column].map(table)
-    bipartite_edges = df.to_numpy()
+    bipartite_edges = df.apply(tuple, axis=1).tolist()
 
     return bipartite_edges

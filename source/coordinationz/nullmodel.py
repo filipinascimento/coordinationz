@@ -9,6 +9,8 @@ from multiprocessing import Pool
 from . import fastcosine
 from numpy.random import SeedSequence, default_rng
 from scipy.stats import rankdata
+# import tracemalloc
+from contextlib import closing
 
 # fastcosine
 
@@ -291,18 +293,18 @@ def bipartiteNullModelSimilarity(
     
     # reindexing the edges
     # if bipartiteEdges is not nupmy array, then convert it to numpy array
-    if(not isinstance(bipartiteEdges, np.ndarray)):
-        bipartiteEdges = np.array(bipartiteEdges)
-    bipartiteIndexedEdges = np.zeros(bipartiteEdges.shape, dtype=int)
-    leftIndex2Label = [label for label in np.unique(bipartiteEdges[:,0])]
+    # if(not isinstance(bipartiteEdges, np.ndarray)):
+    #     bipartiteEdges = np.array(bipartiteEdges)
+    bipartiteIndexedEdges = np.zeros((len(bipartiteEdges),2), dtype=int)
+    # bipartiteEdges is a python list of tuples
+    leftIndex2Label = list(set( edge[0] for edge in bipartiteEdges))
     leftLabel2Index = {label: index for index, label in enumerate(leftIndex2Label)}
-    rightIndex2Label = [label for label in np.unique(bipartiteEdges[:,1])]
+    rightIndex2Label = list(set( edge[1] for edge in bipartiteEdges))
     rightLabel2Index = {label: index for index, label in enumerate(rightIndex2Label)}
     
     # create indexed edges in a numpy array integers
-    bipartiteIndexedEdges[:,0] = [leftLabel2Index[label] for label in bipartiteEdges[:,0]]
-    bipartiteIndexedEdges[:,1] = [rightLabel2Index[label] for label in bipartiteEdges[:,1]]
-
+    bipartiteIndexedEdges[:,0] = [leftLabel2Index[edge[0]] for edge in bipartiteEdges]
+    bipartiteIndexedEdges[:,1] = [rightLabel2Index[edge[1]] for edge in bipartiteEdges]
 
     leftCount = len(leftIndex2Label)
     rightCount = len(rightIndex2Label)
@@ -431,16 +433,23 @@ def bipartiteNullModelSimilarity(
         # print("shuffledEdges: ",shuffledEdges.shape)
         # print("repeatedUniqueLeftDegrees: ",repeatedUniqueLeftDegrees.shape)
         # print("batchParameters: ",len(batchParameters))
+
+
+        # tracemalloc.start()
         belowSimilarityEdgesCount = np.zeros(similarityDataValues.shape[0], dtype=int)
         totalSimilarityEdgesCount = np.zeros(similarityDataValues.shape[0], dtype=int)
 
-
-        with Pool(workers) as pool:
+        print("Using workers: ",workers)
+        with closing(Pool(workers)) as pool:
+        # if True:
             # use imap_unordered to process the batches in parallel
             # also show the progress bar for the batches
+            realizationBatchIndex = 0
             for batchDegreePair2Similarity in currentTQDM(
                 pool.imap_unordered(_processBatch, batchParameters),
                 desc="Null model batches", total=len(batchParameters)):
+            # for parameterSet in tqdm(batchParameters, desc="Null model batches", total=len(batchParameters)):
+            #     batchDegreePair2Similarity = _processBatch(parameterSet)
                 for degreePair, nullModelSimilarities in batchDegreePair2Similarity.items():
                     edgeIndices = degreePair2EdgeIndices[degreePair]
                     edgeSimilarities = similarityDataValues[edgeIndices]
@@ -459,12 +468,22 @@ def bipartiteNullModelSimilarity(
                     belowSimilarityEdgesCount[edgeIndices] += np.sum(nullModelSimilarities[:,None]>=edgeSimilarities[None,:], axis=0)
                     totalSimilarityEdgesCount[edgeIndices] += len(nullModelSimilarities)
 
+                    # if(realizationBatchIndex%100==0):
+                    #     snapshot = tracemalloc.take_snapshot()
+                    #     top_stats = snapshot.statistics('lineno')
+                    #     print("==========MEMORY==========")
+                    #     print("[ Top 10 Memory Consumers ]")
+                    #     for stat in top_stats[:10]:
+                    #         print(stat)
+                    #     print("")
                     
-                    
+                    realizationBatchIndex+=1
                     if returnDegreeSimilarities:
+                        print("Returning Degree Similarities")
                         if(degreePair not in degreePair2similarityComplete):
                             degreePair2similarityComplete[degreePair] = []
                         degreePair2similarityComplete[degreePair].extend(nullModelSimilarities)
+                    del nullModelSimilarities
         similarityPValues = (belowSimilarityEdgesCount+1)/(totalSimilarityEdgesCount+1)
     # print({degreePair: len(similarities) for degreePair, similarities in degreePair2similarity.items()})
 
@@ -476,7 +495,7 @@ def bipartiteNullModelSimilarity(
             returnValues["nullmodelDegreePairsSimilarities"] = degreePair2similarityComplete
             return returnValues
     
-    
+    # tracemalloc.stop()
     # # apply arctanh to the similarities
     # if(fisherTransform):
     #     degreePair2similarity = {degreePair: np.arctanh(similarities) for degreePair, similarities in degreePair2similarity.items()}
