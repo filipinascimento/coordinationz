@@ -1,7 +1,7 @@
 [paths]
 # Location of the raw datasets
-IO_DATASETS = "/mnt/osome/INCAS/infoops_new" # Location of pkl files
-INCAS_DATASETS = "/mnt/osome/INCAS/datasets" # Location of jsonl files
+IO_DATASETS = "/mnt/helios/osome/INCAS/infoops_new" # Location of pkl files
+INCAS_DATASETS = "/mnt/helios/osome/INCAS/datasets" # Location of jsonl files
 
 # Location where the preprocessed datasets will be stored
 PREPROCESSED_DATASETS = "Data/Preprocessed"
