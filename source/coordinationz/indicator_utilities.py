@@ -49,7 +49,7 @@ def obtainBipartiteEdgesRetweets(df):
     if "linked_tweet" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
     df = df[df["tweet_type"] == "retweet"]
-    bipartiteEdges = df[["user_id","linked_tweet"]].values
+    bipartiteEdges = df[["user_id","linked_tweet"]].apply(tuple, axis=1).tolist()
     return bipartiteEdges
 
 
@@ -59,7 +59,7 @@ def obtainBipartiteEdgesRetweetsUsers(df):
     if "linked_tweet_user_id" not in df or "tweet_type" not in df or "user_id" not in df:
         return []
     df = df[df["tweet_type"] == "retweet"]
-    bipartiteEdges = df[["user_id","linked_tweet_user_id"]].values
+    bipartiteEdges = df[["user_id","linked_tweet_user_id"]].apply(tuple, axis=1).tolist()
     return bipartiteEdges
 
 
@@ -180,7 +180,10 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
     # convert url strings that looks like lists to actual lists
     users = df["user_id"]
     textData = df["text"]
-    if("data_translatedContentText" in df):
+    print("----\ntextData1 dtype:   ", textData.dtype)
+    
+    
+    if("data_translatedContentText" in df and not df["data_translatedContentText"].isna().all()):
         textData = df["data_translatedContentText"].copy()
         # for the nans, use the original text
         mask = textData.isna()
@@ -206,31 +209,93 @@ def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=5000, min_activi
     return bipartite_edges
   
 
-def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
-    # goes from right to left
-    bipartiteEdges = np.array(bipartiteEdges)
-    mask = np.ones(len(bipartiteEdges),dtype=bool)
-    if(minRightDegree>1):
-        uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
-        uniqueEdges = np.array(list(uniqueEdges))
-        rightDegrees = Counter(uniqueEdges[:,1])
-        mask &= np.array([rightDegrees[rightNode]>=minRightDegree for _,rightNode in bipartiteEdges])
-    if(minRightStrength>1):
-        rightStrengths = Counter(bipartiteEdges[:,1])
-        mask &= np.array([rightStrengths[rightNode]>=minRightStrength for _,rightNode in bipartiteEdges])
-    bipartiteEdges = bipartiteEdges[mask]
+# def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
+#     # goes from right to left
+#     bipartiteEdges = np.array(bipartiteEdges)
+#     mask = np.ones(len(bipartiteEdges),dtype=bool)
+#     if(minRightDegree>1):
+#         uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
+#         uniqueEdges = np.array(list(uniqueEdges))
+#         rightDegrees = Counter(uniqueEdges[:,1])
+#         mask &= np.array([rightDegrees[rightNode]>=minRightDegree for _,rightNode in bipartiteEdges])
+#     if(minRightStrength>1):
+#         rightStrengths = Counter(bipartiteEdges[:,1])
+#         mask &= np.array([rightStrengths[rightNode]>=minRightStrength for _,rightNode in bipartiteEdges])
+#     bipartiteEdges = bipartiteEdges[mask]
     
-    # goes from left to right
-    mask = np.ones(len(bipartiteEdges),dtype=bool)
-    if(minLeftDegree>1):
-        uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
-        uniqueEdges = np.array(list(uniqueEdges))
-        leftDegrees = Counter(uniqueEdges[:,0])
-        mask &= np.array([leftDegrees[leftNode]>=minLeftDegree for leftNode,_ in bipartiteEdges])
-    if(minLeftStrength>1):
-        leftStrengths = Counter(bipartiteEdges[:,0])
-        mask &= np.array([leftStrengths[leftNode]>=minLeftStrength for leftNode,_ in bipartiteEdges])
-    bipartiteEdges = bipartiteEdges[mask]
+#     # goes from left to right
+#     mask = np.ones(len(bipartiteEdges),dtype=bool)
+#     if(minLeftDegree>1):
+#         uniqueEdges = set(tuple(edge) for edge in bipartiteEdges)
+#         uniqueEdges = np.array(list(uniqueEdges))
+#         leftDegrees = Counter(uniqueEdges[:,0])
+#         mask &= np.array([leftDegrees[leftNode]>=minLeftDegree for leftNode,_ in bipartiteEdges])
+#     if(minLeftStrength>1):
+#         leftStrengths = Counter(bipartiteEdges[:,0])
+#         mask &= np.array([leftStrengths[leftNode]>=minLeftStrength for leftNode,_ in bipartiteEdges])
+#     bipartiteEdges = bipartiteEdges[mask]
+
+#     return bipartiteEdges
+
+# def filterNodesAlternative(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
+#     bipartiteEdges = np.array(bipartiteEdges)
+    
+#     # Right side filtering
+#     if minRightDegree > 1 or minRightStrength > 1:
+#         unique_right, right_counts = np.unique(bipartiteEdges[:, 1], return_counts=True)
+        
+#         if minRightDegree > 1:
+#             valid_right_degree = unique_right[right_counts >= minRightDegree]
+#             mask_degree = np.isin(bipartiteEdges[:, 1], valid_right_degree)
+#             bipartiteEdges = bipartiteEdges[mask_degree]
+        
+#         if minRightStrength > 1:
+#             right_strengths = np.bincount(bipartiteEdges[:, 1])
+#             valid_right_strength = np.where(right_strengths >= minRightStrength)[0]
+#             mask_strength = np.isin(bipartiteEdges[:, 1], valid_right_strength)
+#             bipartiteEdges = bipartiteEdges[mask_strength]
+
+#     # Left side filtering
+#     if minLeftDegree > 1 or minLeftStrength > 1:
+#         unique_left, left_counts = np.unique(bipartiteEdges[:, 0], return_counts=True)
+        
+#         if minLeftDegree > 1:
+#             valid_left_degree = unique_left[left_counts >= minLeftDegree]
+#             mask_degree = np.isin(bipartiteEdges[:, 0], valid_left_degree)
+#             bipartiteEdges = bipartiteEdges[mask_degree]
+        
+#         if minLeftStrength > 1:
+#             left_strengths = np.bincount(bipartiteEdges[:, 0])
+#             valid_left_strength = np.where(left_strengths >= minLeftStrength)[0]
+#             mask_strength = np.isin(bipartiteEdges[:, 0], valid_left_strength)
+#             bipartiteEdges = bipartiteEdges[mask_strength]
+    
+#     return bipartiteEdges
+
+def filterNodes(bipartiteEdges, minRightDegree=1, minRightStrength=1, minLeftDegree=1, minLeftStrength=1):
+    # Process right nodes
+    if minRightDegree > 1 or minRightStrength > 1:
+        uniqueEdges = set(bipartiteEdges)
+        rightDegrees = Counter(rightNode for _, rightNode in uniqueEdges)
+        rightStrengths = Counter(rightNode for _, rightNode in bipartiteEdges)
+        rightNodesToKeep = set(rightDegrees.keys())
+        if minRightDegree > 1:
+            rightNodesToKeep &= {node for node, degree in rightDegrees.items() if degree >= minRightDegree}
+        if minRightStrength > 1:
+            rightNodesToKeep &= {node for node, strength in rightStrengths.items() if strength >= minRightStrength}
+        bipartiteEdges = [edge for edge in bipartiteEdges if edge[1] in rightNodesToKeep]
+    
+    # Process left nodes
+    if minLeftDegree > 1 or minLeftStrength > 1:
+        uniqueEdges = set(bipartiteEdges)
+        leftDegrees = Counter(leftNode for leftNode, _ in uniqueEdges)
+        leftStrengths = Counter(leftNode for leftNode, _ in bipartiteEdges)
+        leftNodesToKeep = set(leftDegrees.keys())
+        if minLeftDegree > 1:
+            leftNodesToKeep &= {node for node, degree in leftDegrees.items() if degree >= minLeftDegree}
+        if minLeftStrength > 1:
+            leftNodesToKeep &= {node for node, strength in leftStrengths.items() if strength >= minLeftStrength}
+        bipartiteEdges = [edge for edge in bipartiteEdges if edge[0] in leftNodesToKeep]
 
     return bipartiteEdges
 
@@ -431,6 +496,7 @@ def parseParameters(config,indicators):
     returnValue["merging"] = generalMergingOptions
     returnValue["community"] = generalCommunitiesOptions
     returnValue["output"] = generalOutputOptions
+
     return returnValue
 
 

@@ -16,6 +16,7 @@ import argparse
 import shutil
 import json
 import pickle
+import multiprocessing as mp
 
 
 # sampled_twitter_en_tl_global_0908
@@ -27,6 +28,7 @@ import pickle
 
 if __name__ == "__main__": # Needed for parallel processing
 
+    mp.set_start_method('spawn')
     dataName = "hamas_israel_challenge_problem_all_20240229"
     indicators = ["coretweet","cohashtag","courl","coretweetusers"]
     tweetIDTextCache = {}
@@ -152,6 +154,7 @@ if __name__ == "__main__": # Needed for parallel processing
                 print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
                 continue
             
+            print(f"Filtering the the nodes in the bipartite network...")
             bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
             # (user_ids, items)
             allUsers.update(set([userid for userid,_ in bipartiteEdges]))
@@ -163,6 +166,16 @@ if __name__ == "__main__": # Needed for parallel processing
             
             # bipartiteEdges.to_csv(networksPath/f"{dataName}_{networkName}_bipartiteEdges.csv", index=False)
             # creates a null model output from the bipartite graph
+            # save the parameters used to create the null model into a pickle file
+            print(f"Creating the null model for the {networkName} network...")
+            # with open(networksPath/f"{dataName}_{networkName}_nullmodel_parameters.pkl", "wb") as f:
+            #     toSaveData = runParameters["nullmodel"][networkName].copy()
+            #     toSaveData["bipartiteEdges"] = bipartiteEdges
+            #     toSaveData["returnDegreeSimilarities"] = False
+            #     toSaveData["returnDegreeValues"] = True
+            #     toSaveData["filterNodesParameters"] = runParameters["filter"][networkName]
+            #     pickle.dump(toSaveData, f,protocol=pickle.HIGHEST_PROTOCOL)
+            
             nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
                 bipartiteEdges,
                 returnDegreeSimilarities=False, # will return the similarities of the nodes
