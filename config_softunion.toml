@@ -1,12 +1,8 @@
 [paths]
 # Location of the raw datasets
 IO_DATASETS = "/mnt/helios/osome/INCAS/infoops_new" # Location of pkl files
-<<<<<<< HEAD
-INCAS_DATASETS = "/mnt/helios/osome/INCAS/datasets" # Location of jsonl files
-=======
 # INCAS_DATASETS = "/mnt/helios/osome/INCAS/datasets" # Location of jsonl files
 INCAS_DATASETS= "/N/slate/potem/project/coordinationz/Data/Preprocessed"
->>>>>>> 130ad59 (fixing the path)
 
 # Location where the preprocessed datasets will be stored
 PREPROCESSED_DATASETS = "Data/Preprocessed"
@@ -25,11 +21,7 @@ scoreType = ["quantile"] # pvalue,
 batchSize = 10
 idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
 workers = -1 # Number of parallel workers. If -1, all the available cores will be used
-<<<<<<< HEAD
 minSimilarity = 0.7 # will only consider similarities above that value
-=======
-minSimilarity = 0.5 # will only consider similarities above that value
->>>>>>> 130ad59 (fixing the path)
 # Specific settings for nullmodel of indicators
 # will overwrite the general settings
 # Example:
@@ -93,11 +85,7 @@ computeCommunityLabels = false
 
 ["output"]
 thresholdAttribute = "quantile"
-<<<<<<< HEAD
 thresholds = [0.95,0.99,0.999,0.9999]
-=======
-thresholds = [0.99, 0.95]
->>>>>>> 130ad59 (fixing the path)
 # Other thresholds that can be used:
 # thresholds = [0.95,0.99,0.999,0.9999,0.99999]
 
