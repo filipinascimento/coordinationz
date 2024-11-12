@@ -203,6 +203,9 @@ if __name__ == "__main__": # Needed for parallel processing
             for key in extraProperties:
                 gThresholded.vs[key] = [extraProperties[key].get(user,"None") for user in gThresholded.vs["Label"]]
 
+        if(gThresholded.vcount()==0 or gThresholded.ecount()==0):
+            print(f"\n-------\nWARNING: No {networkName} nodes or edges found after thresholding.\n-------\n")
+            continue
         xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
         generatedNetworks[networkName] = gThresholded
         

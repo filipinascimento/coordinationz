@@ -15,11 +15,11 @@ CONFIGS = "Outputs/Configs"
 
 # General settings for the null model
 [nullmodel]
-realizations = 10000 # No nullmodel
-scoreType = ["pvalue"] # pvalue, 
-batchSize = 5
+realizations = 0 # No nullmodel
+scoreType = ["quantile"] # pvalue, 
+batchSize = 10
 idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
-workers = 10 # Number of parallel workers. If -1, all the available cores will be used
+workers = -1 # Number of parallel workers. If -1, all the available cores will be used
 minSimilarity = 0.7 # will only consider similarities above that value
 # Specific settings for nullmodel of indicators
 # will overwrite the general settings
@@ -62,6 +62,9 @@ quantile = 0.0
 # minUserDegree = 20
 # threshold = 0.05
 
+[indicator.cohashtag]
+minItemDegree = 1
+
 [indicator.textsimilarity]
 n_buckets = 5000
 cache_path = "Data/Cache"
@@ -70,8 +73,8 @@ cache_path = "Data/Cache"
 
 ["merging"] 
 #method used for merging the networks. Only pvalue or quantile are available for now
-method = "pvalue"
-weightAttribute = "1-pvalue" # Attribute to be used as weight for the merging
+method = "quantile"
+weightAttribute = "quantile" # Attribute to be used as weight for the merging
 shouldAggregate = true
 
 ["community"]
@@ -80,8 +83,8 @@ computeCommunityLabels = false
 # Enable for computing the summarized labels of the communities
 
 ["output"]
-thresholdAttribute = "pvalue"
-thresholds = [0.05,0.01,0.001,0.0001]
+thresholdAttribute = "quantile"
+thresholds = [0.95,0.99,0.999,0.9999]
 # Other thresholds that can be used:
 # thresholds = [0.95,0.99,0.999,0.9999,0.99999]
 
