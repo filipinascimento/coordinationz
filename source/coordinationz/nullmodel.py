@@ -329,6 +329,7 @@ def bipartiteNullModelSimilarity(
                 updateCallback = "progress" if showProgress else None,
                 threshold=minSimilarity,
             )
+            # {(4654, 5164): 0.5051814855409226, (7766, 12298): 0.5477225575051662, (10260, 23710): 0.5000000000000001, (12490, 16857): 0.5454545454545455, (15455, 19562): 0.5000000000000001, (15548, 20969): 0.5222329678670936}
         similarityDataIndices = [(fromIndex, toIndex) for (fromIndex, toIndex), _ in similarityDictionary.items()]
         similarityDataValues = np.array([similarity for (_, _), similarity in similarityDictionary.items()])
         del similarityDictionary
@@ -360,13 +361,16 @@ def bipartiteNullModelSimilarity(
         repeatedUniqueLeftDegrees = np.repeat(uniqueLeftDegrees, repetitionCount)
         repeatedUniqueLeftDegreesIndices = np.repeat(np.arange(len(repeatedUniqueLeftDegrees)), repeatedUniqueLeftDegrees)
 
+        repeatedUniqueLeftDegrees = repeatedUniqueLeftDegrees.astype(int)
         allowedCombinations = None
     else:
         # use degrees from the degreePairsInSimilarity
         uniqueLeftDegrees = np.unique([degreePair[0] for degreePair in degreePairsInSimilarity]+
                                         [degreePair[1] for degreePair in degreePairsInSimilarity])
         # print(uniqueLeftDegrees)
-        repeatedUniqueLeftDegrees = np.repeat(uniqueLeftDegrees, repetitionCount) 
+        repeatedUniqueLeftDegrees = np.repeat(uniqueLeftDegrees, repetitionCount)
+        # setdtype to int
+        repeatedUniqueLeftDegrees = repeatedUniqueLeftDegrees.astype(int)
         # print(repeatedUniqueLeftDegrees)
         repeatedUniqueLeftDegreesIndices = np.repeat(np.arange(len(repeatedUniqueLeftDegrees)), repeatedUniqueLeftDegrees)
 
@@ -408,7 +412,7 @@ def bipartiteNullModelSimilarity(
 
     
     similarityPValues = np.zeros(similarityDataValues.shape[0], dtype=int)
-    if(realizations>0):
+    if(realizations>0 and degreePairsInSimilarity):
         estimatedIDFWeights = estimateIDFWeightsShuffled(bipartiteIndexedEdges, leftCount, rightCount, idf, IDFWeightsRealizations, showProgress=showProgress,workers=workers)
         workers = max(1, workers)
         batchRealizations = realizations//batchSize
