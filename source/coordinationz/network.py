@@ -1,7 +1,7 @@
 
 import numpy as np
 from tqdm.auto import tqdm
-import pandas as pd
+import warnings
 
 def dummyTQDM(*args, **kwargs):
     return args[0]
@@ -98,6 +98,10 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         progressbar.update(1)
         progressbar.set_description("Creating network")
 
+    if edges is None or len(edges) == 0:
+        warnings.warn("No edges found in the network... returning empty graph")
+        edges=None
+    
     g = ig.Graph(
         vertexCount,
         edges,
@@ -187,7 +191,7 @@ def getNetworkTables(gForTable, currentNodes):
     # fill blanks for degree and strength with zeros
     nodesTable["degree"] = nodesTable["degree"].fillna(0)
     nodesTable["strength"] = nodesTable["strength"].fillna(0)
-    
+
     networkIndex2UserID = gForTable.vs["Label"]
     userIDEdges = [(networkIndex2UserID[source],networkIndex2UserID[target]) for source,target in gForTable.get_edgelist()]
     edgesTable = pd.DataFrame(userIDEdges, columns=["source_id","target_id"])
