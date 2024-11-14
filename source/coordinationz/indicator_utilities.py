@@ -7,13 +7,12 @@ import igraph as ig
 # ast evaluates strings that are python expressions
 import ast
 import numpy as np
-from collections import Counter
+from collections import Counter, defaultdict
 
 from nltk.corpus import stopwords
 import nltk
 import re
 import spacy
-import nltk
 from nltk.corpus import stopwords
 import unalix
 from tqdm.auto import tqdm
@@ -630,22 +629,60 @@ def mergedSuspiciousEdges(mergedNetwork):
     # dfEdges.to_csv(networksPath/f"{dataName}_{networkParameters}_merged_edges.csv",index=False)
     return dfEdges
 
+def rankCommunities(gThresholded, strategy="mean", weightAttribute="weight"):
+    communities = defaultdict(list)
+    for v, index in enumerate(gThresholded.vs["CommunityIndex"]):
+        communities[index].append(v)
 
+    communities = [gThresholded.subgraph(gThresholded.vs.select(c)) for c in communities.values()]\
+    
+    key = "CommunityEdgesAvg_" + weightAttribute
+    if strategy == "mean":
+        ranking = lambda c: c.vs[0][key]
+    elif strategy == "sumsqrt":
+        ranking = lambda c: c.vs[0][key] * np.sqrt(c.vs[0]["CommunityEdgesCount"])
+    elif strategy == "max":    
+        ranking = lambda c: max(c.es[weightAttribute])
+    else:
+        raise ValueError(f"Invalid strategy \"{strategy}\"")
 
-def generateEdgesINCASOutput(mergedNetwork, allUsers,
-                             rankingAttribute = "quantile"):
+    communities.sort(key=ranking, reverse=True)
+
+    return communities
+
+def generateEdges(mergedNetwork, rankingAttributes = ["quantile"]):
     edgesData = []
     labels = mergedNetwork.vs["Label"]
-    rankData = mergedNetwork.es[rankingAttribute]
     edgeList = mergedNetwork.get_edgelist()
-    # sort edgeList and quantiles by quantiles
-    edgeList,rankData = zip(*sorted(zip(edgeList,rankData), key=lambda x: x[1], reverse=True))
 
-    for edgeIndex,(fromIndex, toIndex) in enumerate(edgeList):
+    # sort edgeList and quantiles by quantiles
+    for rankingAttribute in rankingAttributes[::-1]:
+        rankData = mergedNetwork.es[rankingAttribute]    
+        edgeList, _ = zip(*sorted(zip(edgeList, rankData), key=lambda x: x[1], reverse=True))
+
+    for edgeIndex, (fromIndex, toIndex) in enumerate(edgeList):
         fromLabel = labels[fromIndex]
         toLabel = labels[toIndex]
         edgesData.append((fromLabel, toLabel))
 
+    return edgesData
+
+def generateEdgesCommunities(communities, rankingAttributes = ["quantile"], communitySize=None):
+    edgesData = []
+    skipCount = 0
+    for community in communities:
+        if communitySize is not None and community.vcount() < communitySize:
+            skipCount += 1
+            continue
+
+        edgesData.extend(generateEdges(community, rankingAttributes=rankingAttributes))
+
+    if communitySize is not None:
+        print(f"Skipped {skipCount} communities below the size threshold...")
+
+    return edgesData
+
+def generateINCASOutput(edgesData, allUsers):
     uniqueUsers = set([user for edge in edgesData for user in edge])
     coordinated = {
         'confidence':1,
@@ -654,6 +691,7 @@ def generateEdgesINCASOutput(mergedNetwork, allUsers,
         'pairs':edgesData,
         'text':f'edges:{len(edgesData)},users:{len(uniqueUsers)}'
     }
+    
     nonCoordinatedUsers = set(allUsers) - uniqueUsers
     non_coordinated = {
         'confidence':0,
@@ -665,8 +703,6 @@ def generateEdgesINCASOutput(mergedNetwork, allUsers,
 
     users = [coordinated,non_coordinated]
     return {"segments":users}
-
-
 
 
 

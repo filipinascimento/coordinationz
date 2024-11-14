@@ -81,26 +81,28 @@ cache_path = "Data/Cache"
 
 
 
-["merging"] 
+[merging] 
 #method used for merging the networks. Only pvalue or quantile are available for now
 method = "max"
 weightAttribute = "similarity" # Attribute to be used as weight for the merging
 shouldAggregate = true
 
-["community"]
+[community]
 detectCommunity = true
 computeCommunityLabels = false
+rankingStrategy = "mean"
 # Enable for computing the summarized labels of the communities
 
-["output"]
+[output]
 thresholdAttribute = "similarity"
 thresholds = [0]
+rankingAttributes = ["weight", "quantile"]
 # For union, thresholds should be [0] (no threshold)
 
 # Specific extra thresholds for the output
 # based on other features
-# ["output.extraThresholds"]
+[output.extraThresholds]
 # quantile = 0.0
-
+communitySize = 5
 
 
