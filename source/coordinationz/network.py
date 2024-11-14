@@ -2,6 +2,7 @@
 import numpy as np
 from tqdm.auto import tqdm
 import warnings
+import pandas as pd
 
 def dummyTQDM(*args, **kwargs):
     return args[0]
