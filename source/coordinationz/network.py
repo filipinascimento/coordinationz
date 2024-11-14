@@ -1,6 +1,8 @@
 
 import numpy as np
 from tqdm.auto import tqdm
+import warnings
+import pandas as pd
 
 def dummyTQDM(*args, **kwargs):
     return args[0]
@@ -97,6 +99,10 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         progressbar.update(1)
         progressbar.set_description("Creating network")
 
+    if edges is None or len(edges) == 0:
+        warnings.warn("No edges found in the network... returning empty graph")
+        edges=None
+    
     g = ig.Graph(
         vertexCount,
         edges,
@@ -166,3 +172,31 @@ def thresholdNetwork(g,thresholds):
     # remove degree 0 nodes
     gThresholded.delete_vertices(gThresholded.vs.select(_degree=0))
     return gThresholded
+
+
+def getNetworkTables(gForTable, currentNodes):
+    # save two tables, one with edges with all edge attributes source, target, ... *all edge attributes*
+    nodesTable = pd.DataFrame(gForTable.vs["Label"], columns=["user_id"])
+    for key in gForTable.vertex_attributes():
+        if(key!="Label"):
+            nodesTable[key] = gForTable.vs[key]
+    # include degree as an attribute
+    nodesTable["degree"] = gForTable.degree()
+    # include strength as an attribute
+    nodesTable["strength"] = gForTable.strength(weights="weight")
+    # add the missing nodes from currentNodes
+    missingNodes = set(currentNodes) - set(nodesTable["user_id"])
+    if(len(missingNodes)>0):
+        missingNodesTable = pd.DataFrame(list(missingNodes), columns=["user_id"])
+        nodesTable = pd.concat([nodesTable,missingNodesTable], ignore_index=True)
+    # fill blanks for degree and strength with zeros
+    nodesTable["degree"] = nodesTable["degree"].fillna(0)
+    nodesTable["strength"] = nodesTable["strength"].fillna(0)
+
+    networkIndex2UserID = gForTable.vs["Label"]
+    userIDEdges = [(networkIndex2UserID[source],networkIndex2UserID[target]) for source,target in gForTable.get_edgelist()]
+    edgesTable = pd.DataFrame(userIDEdges, columns=["source_id","target_id"])
+    for key in gForTable.edge_attributes():
+        edgesTable[key] = gForTable.es[key]
+    return {"nodes":nodesTable,"edges":edgesTable}
+    # save a table with the nodes and their attributes
