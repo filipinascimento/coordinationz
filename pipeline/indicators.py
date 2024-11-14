@@ -209,6 +209,8 @@ if __name__ == "__main__": # Needed for parallel processing
         xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
         generatedNetworks[networkName] = gThresholded
         
+
+        gForTable = gThresholded
         if("community" in runParameters and runParameters["community"]["detectCommunity"]):
             print(f"Finding communities in the {networkName} network...")
             gCommunities = czcom.getNetworksWithCommunities(gThresholded.copy()) #**runParameters["communities"][networkName]
@@ -216,11 +218,19 @@ if __name__ == "__main__": # Needed for parallel processing
             #     print(f"Computing community labels for the {networkName} network...")
             #     gCommunities = czcom.labelCommunities(df,gCommunities,tweetIDTextCache)
             xn.save(gCommunities, networksPath/f"{dataName}_{suffix}_{networkName}_community.xnet")
+            gForTable = gCommunities
+
+        currentNodes = [userid for userid,_ in bipartiteEdges]
+        
+        networkTables = cznet.getNetworkTables(gForTable, currentNodes)
+        networkTables["nodes"].to_csv(tablesPath/f"{dataName}_{suffix}_{networkName}_nodes.csv",index=False)
+        networkTables["edges"].to_csv(tablesPath/f"{dataName}_{suffix}_{networkName}_edges.csv",index=False)
+
     
     print(f"Merging networks...")
     # mergingMethod = runParameters["merging"]["method"]
     # del runParameters["merging"]["method"]
-    mergedNetwork = czind.mergeNetworks(generatedNetworks,
+    originalMergedNetwork = czind.mergeNetworks(generatedNetworks,
                                         **runParameters["merging"])
     
 
@@ -229,7 +239,7 @@ if __name__ == "__main__": # Needed for parallel processing
         thresholdOptions = {}
         thresholdOptions[thresholdAttribute] = threshold
 
-        mergedNetwork = cznet.thresholdNetwork(mergedNetwork,thresholdOptions)
+        mergedNetwork = cznet.thresholdNetwork(originalMergedNetwork,thresholdOptions)
         
         if("community" in runParameters and runParameters["community"]["detectCommunity"]):
             print(f"Finding communities in the merged network...")
@@ -242,6 +252,9 @@ if __name__ == "__main__": # Needed for parallel processing
             mergedNetwork = cznet.thresholdNetwork(mergedNetwork,runParameters["output"]["extraThresholds"])
         
         xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged_{threshold}.xnet")
+        networkTables = cznet.getNetworkTables(mergedNetwork, allUsers)
+        networkTables["nodes"].to_csv(tablesPath/f"{dataName}_{suffix}_merged_nodes_{threshold}.csv",index=False)
+        networkTables["edges"].to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges_{threshold}.csv",index=False)
 
         
         print(f"Saving data...")
