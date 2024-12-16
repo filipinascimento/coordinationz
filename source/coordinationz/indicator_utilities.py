@@ -37,7 +37,7 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         else:
             # activity not retweet
-            userActivityCount = df[df["tweet_type"]!="retweet"]["user_id"].value_counts()
+            userActivityCount = df["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
         df = df[df["user_id"].isin(usersWithMinActivities)]
     return df
