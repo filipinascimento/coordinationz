@@ -117,6 +117,20 @@ if __name__ == "__main__": # Needed for parallel processing
             parameters = {}
         return czind.obtainBipartiteEdgesTextSimilarity(df, dataName, **parameters)
 
+    def external_bipartite(filePath):
+        # 
+        edges = []
+        with open(filePath,"r") as f:
+            for line in f:
+                tokens = line.strip().split(" ")
+                user = tokens[1]
+                multiplicity = int(tokens[2])
+                for i in range(multiplicity):
+                    edges.append((user,tokens[0]))
+        return edges
+
+
+
     # Available indicators
     bipartiteMethod = {
         "coretweet": czind.obtainBipartiteEdgesRetweets,
@@ -124,7 +138,7 @@ if __name__ == "__main__": # Needed for parallel processing
         "courl": czind.obtainBipartiteEdgesURLs,
         "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
         "coword": czind.obtainBipartiteEdgesWords,
-        "textsimilarity": text_similarity_partial
+        "textsimilarity": text_similarity_partial,
     }
 
     runParameters = czind.parseParameters(config,indicators)
@@ -149,16 +163,32 @@ if __name__ == "__main__": # Needed for parallel processing
             import coordinationz.usc_text_similarity as cztext
             g = cztext.text_similarity(dfFiltered)
         else:
-            bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
-            if(len(bipartiteEdges)==0):
-                print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
-                continue
+            if(networkName.startswith("external")):
+                # external:filename.txt
+                # networkName will be ext_filename.stem
+                filePath = Path(networkName.split(":")[1])
+                # networkName = "ext_"+filePath.stem
+                allowedUsers = set(dfFiltered.user_id)
+                bipartiteEdges = external_bipartite(filePath)
+                bipartiteEdges = [(user,item) for user,item in bipartiteEdges if user in allowedUsers]
+                
+                # add networkName to the runParameters["filter"], runParameters["nullmodel"] and runParameters["network"]
+            else:
+                bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
+            
             
             print(f"Filtering the the nodes in the bipartite network...")
             bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
-            # (user_ids, items)
-            allUsers.update(set([userid for userid,_ in bipartiteEdges]))
 
+            if(len(bipartiteEdges)==0):
+                print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
+                continue
+
+            # (user_ids, items)
+            currentNodes = set([userid for userid,_ in bipartiteEdges])
+
+            allUsers.update(currentNodes)
+        
             if(len(bipartiteEdges)==0):
                 print(f"\n-------\nWARNING: No {networkName} edges found after filtering.\n-------\n")
                 continue
@@ -195,7 +225,7 @@ if __name__ == "__main__": # Needed for parallel processing
             user2category = dict(dfFiltered[["user_id","category"]].drop_duplicates().values)
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
-        g = cznet.removeSingletons(g)
+        # g = cznet.removeSingletons(g)
 
         gThresholded = cznet.thresholdNetwork(g, **runParameters["threshold"][networkName])
 
@@ -220,7 +250,6 @@ if __name__ == "__main__": # Needed for parallel processing
             xn.save(gCommunities, networksPath/f"{dataName}_{suffix}_{networkName}_community.xnet")
             gForTable = gCommunities
 
-        currentNodes = [userid for userid,_ in bipartiteEdges]
         
         networkTables = cznet.getNetworkTables(gForTable, currentNodes)
         networkTables["nodes"].to_csv(tablesPath/f"{dataName}_{suffix}_{networkName}_nodes.csv",index=False)
@@ -258,7 +287,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
         
         print(f"Saving data...")
-        allUsers = set(df["user_id"].values)
+        # allUsers = set(df["user_id"].values)
         incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
                                                     rankingAttribute = thresholdAttribute)
         
