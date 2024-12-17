@@ -8,6 +8,7 @@ def dummyTQDM(*args, **kwargs):
     return args[0]
 
 def createNetworkFromNullModelOutput(nullModelOutput,
+                                     currentNodes = set(),
                                      similarityThreshold = 0.0,
                                      pvalueThreshold = 1.0,
                                      quantileThreshold = 0.0,
@@ -170,7 +171,7 @@ def thresholdNetwork(g,thresholds):
             mask &= attributeArray > threshold
     gThresholded.delete_edges(np.where(mask == False)[0])
     # remove degree 0 nodes
-    gThresholded.delete_vertices(gThresholded.vs.select(_degree=0))
+    # gThresholded.delete_vertices(gThresholded.vs.select(_degree=0))
     return gThresholded
 
 
