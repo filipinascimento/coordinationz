@@ -311,13 +311,20 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
                                           compression='gzip')
         datasets[flavor]["category"] = flavor
 
+        # if flavor == 'io':
+        #     datasets[flavor]["created_at"] = pd.to_datetime(datasets[flavor]["account_creation_date"], format='%Y-%m-%d')
+        # else:
+        #     datasets[flavor]["created_at"] = pd.to_datetime(datasets[flavor]["account_creation_date"], format='%a %b %d %H:%M:%S %z %Y')
+            
     print(f"Combining datasets...")
     # concatenate 
     df = pd.concat(datasets.values(), ignore_index=True)
     
-
+    print(df[['account_creation_date']].head())
     print(f"Normalizing attributes...")
     df = df.add_prefix("data_")
+    
+    print(df.columns)
 
     remapAttributes = {
         "tweetid": "tweet_id", # string
@@ -325,7 +332,7 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
         "userid": "user_id", # string
         "tweet_type": "tweet_type", # string
         "tweet_text": "text", # string
-        "created_at": "created_at", # datetime
+        "data_account_creation_date": "created_at", # datetime
         "linked_tweet": "linked_tweet", #retweet/quote/etc/ #string
         "linked_tweet_user_id": "linked_tweet_user_id", #string
         "urls": "urls", #list of strings
@@ -334,14 +341,23 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
         "category": "category"
     }
 
-
+    print(df['data_account_creation_date'].unique())
     # merge mentions and user_mentions
+    df["data_mentions"] = df["data_user_mentions"]
     df["data_mentions"] = df["data_mentions"].combine_first(df["data_user_mentions"])
+    
     # created_at data format: Fri Jul 31 23:56:25 +0000 2020
-    df["data_created_at"] = pd.to_datetime(df["data_created_at"], format='%a %b %d %H:%M:%S %z %Y')
+    # df["data_created_at"] = pd.to_datetime(df["data_account_creation_date"], format='%a %b %d %H:%M:%S %z %Y')
+    # df["data_created_at"] = pd.to_datetime(df["data_account_creation_date"], format='%Y-%m-%d')
+
+    # df["data_created_at"] = pd.to_datetime(df["data_account_creation_date"])
+    # df['data_created_at'] = df['data_created_at'].dt.strftime('%Y-%m-%d')
+
     # same for data_tweet_time but that format: 2014-07-17 00:36
-    df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"], format='%Y-%m-%d %H:%M')
+    # df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"], format='%Y-%m-%d')
+    # df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"])
     # merge the data_creation_date and data_tweet_time
+    df["data_created_at"] = df["data_account_creation_date"]
     df["data_created_at"] = df["data_created_at"].combine_first(df["data_tweet_time"])
 
     # normalize hashtags (string mixed with lists)
