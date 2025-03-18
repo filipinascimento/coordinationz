@@ -336,13 +336,22 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
 
 
     # merge mentions and user_mentions
-    df["data_mentions"] = df["data_mentions"].combine_first(df["data_user_mentions"])
-    # created_at data format: Fri Jul 31 23:56:25 +0000 2020
-    df["data_created_at"] = pd.to_datetime(df["data_created_at"], format='%a %b %d %H:%M:%S %z %Y')
+    if "data_mentions" in df.columns:
+        df["data_mentions"] = df["data_mentions"].combine_first(df["data_user_mentions"])
+    else:
+        df["data_mentions"] = df["data_user_mentions"]
+
     # same for data_tweet_time but that format: 2014-07-17 00:36
-    df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"], format='%Y-%m-%d %H:%M')
-    # merge the data_creation_date and data_tweet_time
-    df["data_created_at"] = df["data_created_at"].combine_first(df["data_tweet_time"])
+    df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"], format="mixed", dayfirst=False, utc=True)
+
+    if "data_created_at" in df.columns:
+        # created_at data format: Fri Jul 31 23:56:25 +0000 2020
+        df["data_created_at"] = pd.to_datetime(df["data_created_at"], format="mixed", dayfirst=False, utc=True)
+
+        # merge the data_creation_date and data_tweet_time
+        df["data_created_at"] = df["data_created_at"].combine_first(df["data_tweet_time"])
+    else:
+        df["data_created_at"] = df["data_tweet_time"]
 
     # normalize hashtags (string mixed with lists)
     # use evaluate literal if it is a string
