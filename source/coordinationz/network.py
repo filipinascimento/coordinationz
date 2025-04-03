@@ -1,6 +1,7 @@
 
 import numpy as np
 from tqdm.auto import tqdm
+import warnings
 
 def dummyTQDM(*args, **kwargs):
     return args[0]
@@ -97,6 +98,10 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         progressbar.update(1)
         progressbar.set_description("Creating network")
 
+    if edges is None or len(edges) == 0:
+        warnings.warn("No edges found in the network... returning empty graph")
+        edges=None
+    
     g = ig.Graph(
         vertexCount,
         edges,

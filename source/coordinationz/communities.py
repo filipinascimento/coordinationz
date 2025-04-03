@@ -85,7 +85,7 @@ def getTokens(tweetID,text,tweetID2Tokens):
 def labelCommunities(df, g, tweetID2TokensCache = {}):
     df = df.copy()
     df["contentText"] = df["text"]
-    if("data_translatedContentText" in df):
+    if("data_translatedContentText" in df and not df["data_translatedContentText"].isna().all()):
         df["contentText"] = df["data_translatedContentText"]
         # for the nans, use the original text
         mask = df["contentText"].isna()
