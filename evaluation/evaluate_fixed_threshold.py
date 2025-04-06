@@ -148,6 +148,8 @@ def number_of_io_control(result_map=dict()):
 
     for indicator in indicators:
         df = result_map[indicator]['node']
+
+        print('Category ', df['category'].unique())
         print('Number of nodes: ', df['index'].nunique())
         print(f'Indicator, {indicator} IO :',
               df.loc[df['category'] == 'io']['userid'].nunique()
@@ -344,7 +346,9 @@ if __name__ == "__main__":
 
     result_map = load_files(mapping, input_path)
     print(result_map.keys())
-
+    
+    number_of_io_control(result_map)
+    
     print('\n')
     sanity_check(result_map)
     print('\n')
@@ -422,12 +426,21 @@ if __name__ == "__main__":
     )
     
 # python evaluate_fixed_threshold.py \
-# --input_path '/N/slate/potem/project/coordinationz/exploration/data' \
-# --coretweet 'uae_082019_1_tweets_softunion_null_manita_coretweet.xnet' \
-# --courl 'uae_082019_1_tweets_softunion_null_manita_courl.xnet' \
-# --cohashtag 'uae_082019_1_tweets_softunion_null_manita_cohashtag.xnet' \
-# --coword 'uae_082019_1_tweets_softunion_null_manita_coword.xnet' \
+# --input_path '/N/slate/potem/project/coordinationz/evaluation/data/uae/uae_new' \
+# --coretweet 'uae_082019_1_tweets_softunion_null_manita_0.5_coretweet.xnet' \
+# --courl 'uae_082019_1_tweets_softunion_null_manita_0.5_courl.xnet' \
+# --cohashtag 'uae_082019_1_tweets_softunion_null_manita_0.5_cohashtag.xnet' \
+# --coword 'uae_082019_1_tweets_softunion_null_manita_0.5_coword.xnet' \
 # --output_path './data/eval_result'
+
+# python evaluate_fixed_threshold.py \
+# --input_path '/N/slate/potem/project/coordinationz/evaluation/data/uae/uae_new' \
+# --coretweet 'uae_082019_1_tweets_softunion_null_manita_0.7_coretweet.xnet' \
+# --courl 'uae_082019_1_tweets_softunion_null_manita_0.7_courl.xnet' \
+# --cohashtag 'uae_082019_1_tweets_softunion_null_manita_0.7_cohashtag.xnet' \
+# --coword 'uae_082019_1_tweets_softunion_null_manita_0.7_coword.xnet' \
+# --output_path './data/eval_result'
+
 
 
 # python evaluate_fixed_threshold.py \
