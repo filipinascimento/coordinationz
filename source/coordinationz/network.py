@@ -50,7 +50,8 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         progressbar.set_description("Processing labels")
     
     vertexAttributes = {
-        "Label": nullModelOutput["labels"]
+        "Label": nullModelOutput["labels"],
+        "name": nullModelOutput["labels"] # needed for union function
     }
 
     if(showProgress):

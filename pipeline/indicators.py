@@ -3,6 +3,7 @@
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import igraph
 from tqdm.auto import tqdm
 import coordinationz as cz
 import xnetwork as xn
@@ -205,20 +206,37 @@ if __name__ == "__main__": # Needed for parallel processing
             #     toSaveData["returnDegreeValues"] = True
             #     toSaveData["filterNodesParameters"] = runParameters["filter"][networkName]
             #     pickle.dump(toSaveData, f,protocol=pickle.HIGHEST_PROTOCOL)
-            
-            nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
-                bipartiteEdges,
-                returnDegreeSimilarities=False, # will return the similarities of the nodes
-                returnDegreeValues=True, # will return the degrees of the nodes
-                **runParameters["nullmodel"][networkName]
-            )
-            # print(runParameters["nullmodel"][networkName])
 
-            # Create a network from the null model output with a pvalue threshold of 0.05
-            g = cznet.createNetworkFromNullModelOutput(
-                nullModelOutput,
-                **runParameters["network"][networkName]
-            )
+            # find connected components
+            b = igraph.Graph.TupleList(bipartiteEdges)
+            cc = b.connected_components(mode="weak")
+            components = [[] for _ in range(len(cc))]
+            component_map = {u: c for u, c in zip(b.vs["name"], cc.membership)}
+            for edge in bipartiteEdges:
+                components[component_map[edge[0]]].append(edge)
+            
+            print(f"Found {len(cc)} connected components...")
+            null_components = []
+            for component in components:
+                nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
+                    component,
+                    returnDegreeSimilarities=False, # will return the similarities of the nodes
+                    returnDegreeValues=True, # will return the degrees of the nodes
+                    **runParameters["nullmodel"][networkName]
+                )
+                # print(runParameters["nullmodel"][networkName])
+
+                # Create a network from the null model output with a pvalue threshold of 0.05
+                c = cznet.createNetworkFromNullModelOutput(
+                    nullModelOutput,
+                    **runParameters["network"][networkName]
+                )
+
+                null_components.append(c)
+
+            g = igraph.union(null_components)
+
+            del g.vs["name"]
 
         if("category" in dfFiltered.columns):
             # dictionary
