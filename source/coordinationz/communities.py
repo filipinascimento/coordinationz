@@ -5,10 +5,16 @@ from collections import Counter
 from tqdm.auto import tqdm
 import coordinationz.indicator_utilities as czind
 
-def getNetworksWithCommunities(gThresholded,weightAttribute="weight"):
-    gThresholded.vs["CommunityIndex"] = gThresholded.community_leiden(objective_function = "modularity",
-                                                                    weights = weightAttribute,
-                                                                    ).membership
+def getNetworksWithCommunities(gThresholded,weightAttribute="weight",leidenTrials=100):
+    best_modularity = -1
+    best_membership = None
+    for _ in range(leidenTrials):
+        membership = gThresholded.community_leiden(objective_function="modularity", weights=weightAttribute).membership
+        modularity = gThresholded.modularity(membership, weights=weightAttribute)
+        if modularity > best_modularity:
+            best_modularity = modularity
+            best_membership = membership
+    gThresholded.vs["CommunityIndex"] = best_membership
     gThresholded.vs["CommunityLabel"] = [f"{i}" for i in gThresholded.vs["CommunityIndex"]]
     allCommunities = set(gThresholded.vs["CommunityIndex"])
     community2Size = {}
@@ -85,7 +91,7 @@ def getTokens(tweetID,text,tweetID2Tokens):
 def labelCommunities(df, g, tweetID2TokensCache = {}):
     df = df.copy()
     df["contentText"] = df["text"]
-    if("data_translatedContentText" in df):
+    if("data_translatedContentText" in df and not df["data_translatedContentText"].isna().all()):
         df["contentText"] = df["data_translatedContentText"]
         # for the nans, use the original text
         mask = df["contentText"].isna()
@@ -132,7 +138,7 @@ def labelCommunities(df, g, tweetID2TokensCache = {}):
     tokenSumCount = 0
     retweetTokenSumCount = 0
 
-    penaltyFactor = 4
+    penaltyFactor = 3
     transform = lambda x: x
     # transform = lambda x: np.log(x+1)
 
@@ -397,5 +403,4 @@ def labelCommunities(df, g, tweetID2TokensCache = {}):
         if(not node["Surprising Retweet Tokens"]):
             node["Surprising Retweet Tokens"] = "None"
     return gThresholded
-
 

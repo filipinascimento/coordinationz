@@ -75,14 +75,24 @@ np_dep = declare_dependency(include_directories: inc_np, compile_args: numpy_nod
 
 # include openmp depend
 # omp_dep = cc.find_library('openmp', required: true)
-omp_dep = dependency('openmp')
+dependencies = []
+dependencies += [np_dep]
+
+
+host_system = host_machine.system()
+
+# Conditional configurations based on host system
+if host_system != 'darwin'
+    omp_dep = dependency('openmp')
+    dependencies += [omp_dep]
+endif
 
 py3_extension = py3.extension_module(
     'fastcosine_core', 
     sources: c_sources,
     install: true,
     subdir: 'coordinationz',
-    dependencies: [np_dep,omp_dep],
+    dependencies: dependencies,
     # include_directories: inc_dirs
 )
 

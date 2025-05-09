@@ -1,7 +1,7 @@
 [paths]
 # Location of the raw datasets
-IO_DATASETS = "/mnt/osome/INCAS/infoops_new" # Location of pkl files
-INCAS_DATASETS = "/mnt/osome/INCAS/datasets" # Location of jsonl files
+IO_DATASETS = "/mnt/helios/osome/INCAS/infoops_new" # Location of pkl files
+INCAS_DATASETS = "/mnt/helios/osome/INCAS/datasets" # Location of jsonl files
 
 # Location where the preprocessed datasets will be stored
 PREPROCESSED_DATASETS = "Data/Preprocessed"
@@ -15,13 +15,12 @@ CONFIGS = "Outputs/Configs"
 
 # General settings for the null model
 [nullmodel]
-realizations = 0 # No nullmodel
-scoreType = ["quantile"] # pvalue-quantized, pvalue, or zscore, 
-pvaluesQuantized = [0.00001,0.00002,0.0001,0.0002,0.0005,0.001,0.005,0.002,0.01,0.02,0.05,0.1,0.25,0.5]
-batchSize = 10
+realizations = 10000 # No nullmodel
+scoreType = ["pvalue"] # pvalue, 
+batchSize = 5
 idf = "smoothlog" # None, "none", "linear", "smoothlinear", "log", "smoothlog"
-workers = -1 # Number of parallel workers. If -1, all the available cores will be used
-minSimilarity = 0.0 # will only consider similarities above that value
+workers = 10 # Number of parallel workers. If -1, all the available cores will be used
+minSimilarity = 0.7 # will only consider similarities above that value
 # Specific settings for nullmodel of indicators
 # will overwrite the general settings
 # Example:
@@ -41,7 +40,7 @@ minUserDegree = 10
 minUserStrength = 1
 # total number of different users(right nodes) for that indicator
 # e.g., minimum unique users that used a hashtag
-minItemDegree = 1
+minItemDegree = 10
 # total activity of the item for that indicator
 # e.g., minimum uses of a hashtag
 minItemStrength = 1
@@ -63,9 +62,6 @@ quantile = 0.0
 # minUserDegree = 20
 # threshold = 0.05
 
-[indicator.cohashtag]
-minItemDegree = 1
-
 [indicator.textsimilarity]
 n_buckets = 5000
 cache_path = "Data/Cache"
@@ -74,17 +70,20 @@ cache_path = "Data/Cache"
 
 ["merging"] 
 #method used for merging the networks. Only pvalue or quantile are available for now
-method = "quantile"
-weightAttribute = "quantile" # Attribute to be used as weight for the merging
+method = "pvalue"
+weightAttribute = "1-pvalue" # Attribute to be used as weight for the merging
 shouldAggregate = true
 
 ["community"]
 detectCommunity = true
 computeCommunityLabels = false
+# Enable for computing the summarized labels of the communities
 
 ["output"]
-thresholdAttribute = "quantile"
-thresholds = [0.95,0.99,0.999,0.9999,0.99999]
+thresholdAttribute = "pvalue"
+thresholds = [0.05,0.01,0.001,0.0001]
+# Other thresholds that can be used:
+# thresholds = [0.95,0.99,0.999,0.9999,0.99999]
 
 # Specific extra thresholds for the output
 # based on other features

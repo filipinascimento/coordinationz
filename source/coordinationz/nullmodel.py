@@ -9,6 +9,8 @@ from multiprocessing import Pool
 from . import fastcosine
 from numpy.random import SeedSequence, default_rng
 from scipy.stats import rankdata
+# import tracemalloc
+from contextlib import closing
 
 # fastcosine
 
@@ -64,8 +66,8 @@ def _processBatch(parameters):
                 weights = None
             # FIXME: Incude the option to choose the similarity metric
             # or to send a custom function
-            similarityDictionary={}
-            similarityDictionary = fastcosine.bipartiteCosine(
+            modelSimilarityDictionary={}
+            modelSimilarityDictionary = fastcosine.bipartiteCosine(
                 batchReducedShuffledEdges,
                 weights=weights,
                 rightCount=rightCount,
@@ -75,7 +77,7 @@ def _processBatch(parameters):
             )
             # (batchReducedShuffledEdges,rightCount=rightCount)
             # ------
-            # for (fromIndex, toIndex),similarity in similarityDictionary.items():
+            # for (fromIndex, toIndex),similarity in modelSimilarityDictionary.items():
             #     # print(fromIndex, toIndex)
             #     fromDegree = repeatedUniqueLeftDegrees[fromIndex]
             #     toDegree = repeatedUniqueLeftDegrees[toIndex]
@@ -94,11 +96,11 @@ def _processBatch(parameters):
                 if(fromIndex==toIndex):
                     continue
                 combinationIndices = (fromIndex, toIndex)
-                if(combinationIndices not in similarityDictionary):
+                if(combinationIndices not in modelSimilarityDictionary):
                     similarity=0.0
                     # continue
                 else:
-                    similarity = similarityDictionary[combinationIndices]
+                    similarity = modelSimilarityDictionary[combinationIndices]
                 fromDegree = repeatedUniqueLeftDegrees[fromIndex]
                 toDegree = repeatedUniqueLeftDegrees[toIndex]
                 degreeEdge = (min(fromDegree, toDegree), max(fromDegree, toDegree))
@@ -174,9 +176,7 @@ def estimateIDFWeightsShuffled(bipartiteIndexedEdges, leftCount, rightCount, idf
 
 def bipartiteNullModelSimilarity(
         bipartiteEdges,
-        scoreType=["zscore","pvalue-quantized"], # "zscore", "pvalue" | "pvalue-quantized", "onlynullmodel", "quantile", "quantilesimilarity" are valid
-        pvaluesQuantized = None, # can be a number or a list of pvalues, defaults to 2*orders of magnitude(realizations)
-        fisherTransform = False,
+        scoreType=["pvalue"], # "pvalue", "onlynullmodel", "quantile", "quantilesimilarity" are valid
         realizations = 10000,
         repetitionCount = 2,
         minSimilarity = 0.0,
@@ -196,20 +196,13 @@ def bipartiteNullModelSimilarity(
     ----------
     bipartiteEdges: np.ndarray
         The indexed edges of the bipartite graph
-    scoreType: string or list containing "pvalue", "pvalue-quantized", "zscore", "quantile", "quantilesimilarity" or "onlynullmodel"
-        The type of score to calculate, can be "pvalue", "pvalue-quantized", "zscore",
+    scoreType: string or list containing "pvalue", "quantile", "quantilesimilarity" or "onlynullmodel"
+        The type of score to calculate, can be "pvalue",
         "quantile","quantilesimilarity", or "onlynullmodel",
         if "onlynullmodel" is selected, then the function will only return the
         degree similarities.
         if "quantile" is used, then it will return the quantile of the similarity across all possible links
-        defaults to ["pvalue-quantized","zscore"]
-    pvaluesQuantized: int or list
-        The number of quantiles to use for the pvalues, defaults to the orders
-        of magnitude of the realizations,
-        or a list of pvalues to use for the quantiles
-    fisherTransform: bool
-        Whether to apply the Fisher transformation to the similarities
-        defaults to False
+        defaults to ["pvalue"]
     realizations: int
         The number of realizations to use for the null model
         if 0, then it will only return the similarities,
@@ -242,6 +235,8 @@ def bipartiteNullModelSimilarity(
     showProgress: bool
         Whether to show the progress bar
         defaults to True
+    storeAllSimilarities: bool
+        Whether to store all similarities in the null model
     batchSize: int
         The batch size to use for the parallel processing
         defaults to 100
@@ -254,8 +249,7 @@ def bipartiteNullModelSimilarity(
     Returns:
     --------
     returnValue: dict
-        A dictionary containing the indexed edges, the similarities, the pvalues
-        or zscores and the labels of the nodes.
+        A dictionary containing the indexed edges, the similarities, the pvalues and the labels of the nodes.
         If returnDegreeSimilarities is True, then the dictionary will also
         contain the degree similarities.
         If returnDegreeValues is True, then the dictionary will also contain
@@ -264,8 +258,6 @@ def bipartiteNullModelSimilarity(
     # print all parameters:
     # print("bipartiteEdges: ",bipartiteEdges)
     # print("scoreType: ",scoreType)
-    # print("pvaluesQuantized: ",pvaluesQuantized)
-    # print("fisherTransform: ",fisherTransform)
     # print("realizations: ",realizations)
     # print("repetitionCount: ",repetitionCount)
     # print("minSimilarity: ",minSimilarity)
@@ -278,7 +270,7 @@ def bipartiteNullModelSimilarity(
     # print("workers: ",workers)
     # print("\n")
 
-    # scoreType can be a list or string of "zscore", "pvalue", "pvalue-quantized", "onlynullmodel"
+    # scoreType can be a list or string, "pvalue", "onlynullmodel"
     # "onlynullmodel" can not be used in list
     
     if(isinstance(scoreType, str)):
@@ -290,50 +282,29 @@ def bipartiteNullModelSimilarity(
         if(len(scoreTypes)>1):
             raise ValueError("onlynullmodel can not be used with other score types")
 
-    # pvalue and pvalue-quantized can not be used together
-    if("pvalue" in scoreTypes and "pvalue-quantized" in scoreTypes):
-        raise ValueError("pvalue and pvalue-quantized can not be used together")
-
 
     shouldCalculatePvalues = "pvalue" in scoreTypes
-    shouldCalculatePvaluesQuantized = "pvalue-quantized" in scoreTypes
-    shouldCalculateZscores = "zscore" in scoreTypes
     onlyNullModel = "onlynullmodel" in scoreTypes
 
     currentTQDM = tqdm if showProgress else _tqdmDummy
-    if (shouldCalculatePvaluesQuantized):
-        # if pvalues is a number (any type), then we will use it as the number of quantiles
-        if(pvaluesQuantized is None):
-            pvaluesQuantized = 2*np.log10(realizations)+1
-        if(isinstance(pvaluesQuantized, (int, float))):
-            pvaluesCount = int(pvaluesQuantized)
-            # Predefine the pvalues based on the number of realizations
-            # we want to have 10 quantiles 
-            # distribute over the log space based on the number of realizations
-            realizationMagnitude = np.log10(realizations)
-            pvaluesQuantized = np.logspace(-realizationMagnitude, 0, pvaluesCount)
-        else:
-            pvaluesQuantized = list(pvaluesQuantized)
-            # sort
-            pvaluesQuantized.sort()
     
     if(workers == -1):
         workers = mp.cpu_count()
     
     # reindexing the edges
     # if bipartiteEdges is not nupmy array, then convert it to numpy array
-    if(not isinstance(bipartiteEdges, np.ndarray)):
-        bipartiteEdges = np.array(bipartiteEdges)
-    bipartiteIndexedEdges = np.zeros(bipartiteEdges.shape, dtype=int)
-    leftIndex2Label = [label for label in np.unique(bipartiteEdges[:,0])]
+    # if(not isinstance(bipartiteEdges, np.ndarray)):
+    #     bipartiteEdges = np.array(bipartiteEdges)
+    bipartiteIndexedEdges = np.zeros((len(bipartiteEdges),2), dtype=int)
+    # bipartiteEdges is a python list of tuples
+    leftIndex2Label = list(set( edge[0] for edge in bipartiteEdges))
     leftLabel2Index = {label: index for index, label in enumerate(leftIndex2Label)}
-    rightIndex2Label = [label for label in np.unique(bipartiteEdges[:,1])]
+    rightIndex2Label = list(set( edge[1] for edge in bipartiteEdges))
     rightLabel2Index = {label: index for index, label in enumerate(rightIndex2Label)}
     
     # create indexed edges in a numpy array integers
-    bipartiteIndexedEdges[:,0] = [leftLabel2Index[label] for label in bipartiteEdges[:,0]]
-    bipartiteIndexedEdges[:,1] = [rightLabel2Index[label] for label in bipartiteEdges[:,1]]
-
+    bipartiteIndexedEdges[:,0] = [leftLabel2Index[edge[0]] for edge in bipartiteEdges]
+    bipartiteIndexedEdges[:,1] = [rightLabel2Index[edge[1]] for edge in bipartiteEdges]
 
     leftCount = len(leftIndex2Label)
     rightCount = len(rightIndex2Label)
@@ -343,7 +314,8 @@ def bipartiteNullModelSimilarity(
         # print("weights: ",len(weights),"edges: ",len(indexedEdges))
     # print("weights:",weights)
     
-    similarityDictionary = None
+    similarityDataIndices = None
+    similarityDataValues = None
     
     if(not onlyNullModel):
         for _ in currentTQDM(range(1), desc="Calculating original similarity matrix"):
@@ -357,6 +329,10 @@ def bipartiteNullModelSimilarity(
                 updateCallback = "progress" if showProgress else None,
                 threshold=minSimilarity,
             )
+            # {(4654, 5164): 0.5051814855409226, (7766, 12298): 0.5477225575051662, (10260, 23710): 0.5000000000000001, (12490, 16857): 0.5454545454545455, (15455, 19562): 0.5000000000000001, (15548, 20969): 0.5222329678670936}
+        similarityDataIndices = [(fromIndex, toIndex) for (fromIndex, toIndex), _ in similarityDictionary.items()]
+        similarityDataValues = np.array([similarity for (_, _), similarity in similarityDictionary.items()])
+        del similarityDictionary
 
     leftDegrees = np.zeros(leftCount, dtype=int)
     rightDegrees = np.zeros(rightCount, dtype=int)
@@ -367,8 +343,8 @@ def bipartiteNullModelSimilarity(
 
     # degrees in the similarity matrix
     degreePairsInSimilarity = set()
-    if(similarityDictionary is not None):
-        for (fromIndex, toIndex) in similarityDictionary.keys():
+    if(similarityDataIndices is not None):
+        for (fromIndex, toIndex) in similarityDataIndices:
             fromDegree = leftDegrees[fromIndex]
             toDegree = leftDegrees[toIndex]
             degreePairsInSimilarity.add((min(fromDegree, toDegree), max(fromDegree, toDegree)))
@@ -385,13 +361,16 @@ def bipartiteNullModelSimilarity(
         repeatedUniqueLeftDegrees = np.repeat(uniqueLeftDegrees, repetitionCount)
         repeatedUniqueLeftDegreesIndices = np.repeat(np.arange(len(repeatedUniqueLeftDegrees)), repeatedUniqueLeftDegrees)
 
+        repeatedUniqueLeftDegrees = repeatedUniqueLeftDegrees.astype(int)
         allowedCombinations = None
     else:
         # use degrees from the degreePairsInSimilarity
         uniqueLeftDegrees = np.unique([degreePair[0] for degreePair in degreePairsInSimilarity]+
                                         [degreePair[1] for degreePair in degreePairsInSimilarity])
         # print(uniqueLeftDegrees)
-        repeatedUniqueLeftDegrees = np.repeat(uniqueLeftDegrees, repetitionCount) 
+        repeatedUniqueLeftDegrees = np.repeat(uniqueLeftDegrees, repetitionCount)
+        # setdtype to int
+        repeatedUniqueLeftDegrees = repeatedUniqueLeftDegrees.astype(int)
         # print(repeatedUniqueLeftDegrees)
         repeatedUniqueLeftDegreesIndices = np.repeat(np.arange(len(repeatedUniqueLeftDegrees)), repeatedUniqueLeftDegrees)
 
@@ -408,75 +387,128 @@ def bipartiteNullModelSimilarity(
     # print("allowedCombinations", allowedCombinations)
     # print("\n")
 
+
+
+    degreePair2EdgeIndices = {} 
+    for edgeIndex, (fromIndex, toIndex) in enumerate(similarityDataIndices):
+        fromDegree = leftDegrees[fromIndex]
+        toDegree = leftDegrees[toIndex]
+        degreePair = (min(fromDegree, toDegree), max(fromDegree, toDegree))
+        if(degreePair not in degreePair2EdgeIndices):
+            degreePair2EdgeIndices[degreePair] = []
+        degreePair2EdgeIndices[degreePair].append(edgeIndex)
+
+
+    
+
     shuffledEdges = bipartiteIndexedEdges.copy()
-        
+    
+    
 
 
     # divide realizations into batches of size batchSize
 
-    degreePair2similarity = {}
-    
+    degreePair2similarityComplete = {}
 
-    if(realizations>0):
+    
+    similarityPValues = np.zeros(similarityDataValues.shape[0], dtype=int)
+    if(realizations>0 and degreePairsInSimilarity):
         estimatedIDFWeights = estimateIDFWeightsShuffled(bipartiteIndexedEdges, leftCount, rightCount, idf, IDFWeightsRealizations, showProgress=showProgress,workers=workers)
+        workers = max(1, workers)
+        batchRealizations = realizations//batchSize
+        batchRealizationsRemainder = realizations%batchSize
+        batchRealizationsList = [batchSize]*batchRealizations
 
-        if(workers <= 1):
-            degreePair2similarity = _processBatch((realizations,
-                        currentTQDM, allowedCombinations, repeatedUniqueLeftDegreesIndices,
-                        shuffledEdges,estimatedIDFWeights,rightCount,repeatedUniqueLeftDegrees,
-                        True,None))
-        else:
-            batchRealizations = realizations//batchSize
-            batchRealizationsRemainder = realizations%batchSize
-            batchRealizationsList = [batchSize]*batchRealizations
+        # create streams for the children
+        seedSequence = SeedSequence()
+        childSeeds = seedSequence.spawn(batchRealizations)
 
-            # create streams for the children
-            seedSequence = SeedSequence()
-            childSeeds = seedSequence.spawn(batchRealizations)
+        
+        if(batchRealizationsRemainder>0):
+            batchRealizationsList.append(batchRealizationsRemainder)
 
-            
-            if(batchRealizationsRemainder>0):
-                batchRealizationsList.append(batchRealizationsRemainder)
-
-            batchParameters = [(batchRealizations,None,allowedCombinations,repeatedUniqueLeftDegreesIndices,
-                                shuffledEdges,estimatedIDFWeights,rightCount,repeatedUniqueLeftDegrees,
-                                False,childSeed) for batchRealizations,childSeed in zip(batchRealizationsList,childSeeds)]
-            
-            # print("Shapes of all parameters")
-            # # print("allowedCombinations: ",len(allowedCombinations))
-            # print("repeatedUniqueLeftDegreesIndices: ",repeatedUniqueLeftDegreesIndices.shape)
-            # print("shuffledEdges: ",shuffledEdges.shape)
-            # print("repeatedUniqueLeftDegrees: ",repeatedUniqueLeftDegrees.shape)
-            # print("batchParameters: ",len(batchParameters))
+        batchParameters = [(batchRealizations,None,allowedCombinations,repeatedUniqueLeftDegreesIndices,
+                            shuffledEdges,estimatedIDFWeights,rightCount,repeatedUniqueLeftDegrees,
+                            False,childSeed) for batchRealizations,childSeed in zip(batchRealizationsList,childSeeds)]
+        
+        # print("Shapes of all parameters")
+        # # print("allowedCombinations: ",len(allowedCombinations))
+        # print("repeatedUniqueLeftDegreesIndices: ",repeatedUniqueLeftDegreesIndices.shape)
+        # print("shuffledEdges: ",shuffledEdges.shape)
+        # print("repeatedUniqueLeftDegrees: ",repeatedUniqueLeftDegrees.shape)
+        # print("batchParameters: ",len(batchParameters))
 
 
-            with Pool(workers) as pool:
-                # use imap_unordered to process the batches in parallel
-                # also show the progress bar for the batches
-                for batchDegreePair2Similarity in currentTQDM(
-                    pool.imap_unordered(_processBatch, batchParameters),
-                    desc="Null model batches", total=len(batchParameters)):
-                    for degreePair, similarities in batchDegreePair2Similarity.items():
-                        if(degreePair not in degreePair2similarity):
-                            degreePair2similarity[degreePair] = []
-                        degreePair2similarity[degreePair].extend(similarities)
+        # tracemalloc.start()
+        belowSimilarityEdgesCount = np.zeros(similarityDataValues.shape[0], dtype=int)
+        totalSimilarityEdgesCount = np.zeros(similarityDataValues.shape[0], dtype=int)
+
+        print("Using workers: ",workers)
+        with closing(Pool(workers)) as pool:
+        # if True:
+            # use imap_unordered to process the batches in parallel
+            # also show the progress bar for the batches
+            realizationBatchIndex = 0
+            for batchDegreePair2Similarity in currentTQDM(
+                pool.imap_unordered(_processBatch, batchParameters),
+                desc="Null model batches", total=len(batchParameters)):
+            # for parameterSet in tqdm(batchParameters, desc="Null model batches", total=len(batchParameters)):
+            #     batchDegreePair2Similarity = _processBatch(parameterSet)
+                for degreePair, nullModelSimilarities in batchDegreePair2Similarity.items():
+                    edgeIndices = degreePair2EdgeIndices[degreePair]
+                    edgeSimilarities = similarityDataValues[edgeIndices]
+                    nullModelSimilarities = np.array(nullModelSimilarities) # 
+                    # print("-----")
+                    # print("degreePair",degreePair)
+                    # print("edgeIndices",edgeIndices)
+                    # print("belowSimilarityEdgesCount",belowSimilarityEdgesCount)
+                    # print("totalSimilarityEdgesCount",totalSimilarityEdgesCount)
+                    # print("nullModelSimilarities",nullModelSimilarities)
+                    # print("edgeSimilarities",edgeSimilarities)
+                    # print("(nullModelSimilarities[:,None]<edgeSimilarities[None,:]).shape",(nullModelSimilarities[:,None]<edgeSimilarities[None,:]).shape)
+                    # print("np.sum(nullModelSimilarities[:,None]<edgeSimilarities[None,:], axis=0)",np.sum(nullModelSimilarities[:,None]<edgeSimilarities[None,:], axis=0))
+                    # print("-----")
+                    # need to count the number of null model similarities that are below the original similarity for each edge
+                    belowSimilarityEdgesCount[edgeIndices] += np.sum(nullModelSimilarities[:,None]>=edgeSimilarities[None,:], axis=0)
+                    totalSimilarityEdgesCount[edgeIndices] += len(nullModelSimilarities)
+
+                    # if(realizationBatchIndex%100==0):
+                    #     snapshot = tracemalloc.take_snapshot()
+                    #     top_stats = snapshot.statistics('lineno')
+                    #     print("==========MEMORY==========")
+                    #     print("[ Top 10 Memory Consumers ]")
+                    #     for stat in top_stats[:10]:
+                    #         print(stat)
+                    #     print("")
+                    
+                    realizationBatchIndex+=1
+                    if returnDegreeSimilarities:
+                        print("Returning Degree Similarities")
+                        if(degreePair not in degreePair2similarityComplete):
+                            degreePair2similarityComplete[degreePair] = []
+                        degreePair2similarityComplete[degreePair].extend(nullModelSimilarities)
+                    del nullModelSimilarities
+        similarityPValues = (belowSimilarityEdgesCount+1)/(totalSimilarityEdgesCount+1)
+    # print({degreePair: len(similarities) for degreePair, similarities in degreePair2similarity.items()})
+
+    if degreePair2similarityComplete:
+        degreePair2similarityComplete = {degreePair: np.array(similarities) for degreePair, similarities in degreePair2similarityComplete.items()}
+
+        if(onlyNullModel):
+            returnValues = {}
+            returnValues["nullmodelDegreePairsSimilarities"] = degreePair2similarityComplete
+            return returnValues
     
-        # print({degreePair: len(similarities) for degreePair, similarities in degreePair2similarity.items()})
-
-        degreePair2similarity = {degreePair: np.array(similarities) for degreePair, similarities in degreePair2similarity.items()}
-
-    if(onlyNullModel):
-        returnValues = {}
-        returnValues["nullmodelDegreePairsSimilarities"] = degreePair2similarity
-        return returnValues
+    # tracemalloc.stop()
+    # # apply arctanh to the similarities
+    # if(fisherTransform):
+    #     degreePair2similarity = {degreePair: np.arctanh(similarities) for degreePair, similarities in degreePair2similarity.items()}
+    #     # originalSimilarityMatrix.data = np.arctanh(originalSimilarityMatrix.data)
+    #     # apply np.arctanh(similarity) on similarityData
+    #     similarityData = [(fromIndex, toIndex, np.arctanh(similarity)) for fromIndex, toIndex, similarity in similarityData]
     
-    
-    # apply arctanh to the similarities
-    if(fisherTransform):
-        degreePair2similarity = {degreePair: np.arctanh(similarities) for degreePair, similarities in degreePair2similarity.items()}
-        # originalSimilarityMatrix.data = np.arctanh(originalSimilarityMatrix.data)
-        for edge,similarity in similarityDictionary.items():
-            similarityDictionary[edge] = np.arctanh(similarity)
+
+
     # get >0 indices: fromIndex, toIndex, similarity
     # remember that  originalSimilarityMatrix is a symmetric matrix sparse CRS matrix
 
@@ -509,117 +541,15 @@ def bipartiteNullModelSimilarity(
     
 
     returnValues = {}
-    if(realizations==0):
-        resultsIndexedEdges = []
-        resultSimilarities = []
-        for (fromIndex, toIndex), originalSimilarity in similarityDictionary.items():
-            resultsIndexedEdges.append((fromIndex, toIndex))
-            resultSimilarities.append(originalSimilarity)
-        returnValues["indexedEdges"] = resultsIndexedEdges
-        returnValues["similarities"] = resultSimilarities
-        # calculate quantiles
-        if("quantile" in scoreTypes):
-            # will calculate the quantiles, i.e., how many similarities are above each similarity value
-            # (for each pair in resultSimilarities)
-            pairsCount = leftCount*(leftCount-1)//2
-            rank = rankdata(resultSimilarities, method="max")
-            returnValues["quantiles"] = (pairsCount-len(rank)+rank)/pairsCount
-
-        if("quantilesimilarity" in scoreTypes):
-            # will calculate the quantiles, i.e., how many similarities are above each similarity value
-            # (for each pair in resultSimilarities)
-            pairsCount = leftCount*(leftCount-1)//2
-            rank = rankdata(resultSimilarities, method="max")
-            returnValues["quantilesimilarities"] = ((pairsCount-len(rank)+rank)/pairsCount)*resultSimilarities
-
-            # print(f"LeftCount: {pairsCount} len(resultSimilarities): {len(resultSimilarities)}")
-        if(returnDegreeValues):
-            returnValues["degrees"] = leftDegrees
-        returnValues["labels"] = leftIndex2Label
-        return returnValues
-    
-    # FIXME: This need to be optimized!
-    # Some potential solutions:
-    # 1. Use parallel processing
-    # 2. Use cython, numba or C extensions
-    # 3. Keep a cache of combinations of similarity and degree pairs
     resultsIndexedEdges = []
     resultSimilarities = []
-    resultPValues = []
-    resultZScores = []
-    
-    sameDegreeExpectedCount = realizations*(repetitionCount-1)*(repetitionCount)//2
-    differentDegreeExpectedCount = repetitionCount*repetitionCount*realizations
-    
-    # FIXME: In search for a way to store only positive similarities in the null model
-    # and then calculate the pvalues and zscores for the original similarities.
-    # THIS IS A BOTTLNECK
-    #
-    # def calculateQuantile(degreePair, similarities, pvalue):
-    #     if(degreePair[0]==degreePair[1]):
-    #         zeroSimilaritiesCount = sameDegreeExpectedCount-len(similarities)
-    #     else:
-    #         zeroSimilaritiesCount = differentDegreeExpectedCount-len(similarities)
-
-    #     if(pvalue==1.0 and zeroSimilaritiesCount>0):
-    #         return 0.0
-        
-    #     sortedSimilarities = np.sort(similarities)
-    #     thresholdIndex = int((1.0 - pvalue) * (len(similarities) + zeroSimilaritiesCount))
-    #     threshold = sortedSimilarities[thresholdIndex]
-    #     return threshold
-    
-    # def calculateQuantile(zeroSimilaritiesCount, similarities, pvalue):
-    #     if(pvalue==1.0 and zeroSimilaritiesCount>0):
-    #         return 0.0
-    #     sortedSimilarities = np.sort(similarities)
-    #     thresholdIndex = int((1.0 - pvalue) * (len(similarities) + zeroSimilaritiesCount))
-    #     threshold = sortedSimilarities[thresholdIndex]
-    #     return threshold
-    # calculate 
-    
-
-    if(shouldCalculatePvaluesQuantized): #prepare threhshold ranges
-        precalculatedThresholds = []
-        for pvalue in pvaluesQuantized:
-            precalculatedThresholds.append({degreePair: np.quantile(similarities, 1.0-pvalue) for degreePair, similarities in degreePair2similarity.items()})
-            # precalculatedThresholds.append({degreePair: calculateQuantile(degreePair, similarities, pvalue) for degreePair, similarities in degreePair2similarity.items()})
-
-    if(shouldCalculateZscores): #prepare std dev and mean
-        precalculatedMeans = {degreePair: np.nanmean(similarities) for degreePair, similarities in degreePair2similarity.items()}
-        precalculatedSTDs = {degreePair: np.nanstd(similarities) for degreePair, similarities in degreePair2similarity.items()}
-
-    for (fromIndex, toIndex), originalSimilarity in currentTQDM(similarityDictionary.items(),
-                            desc="Calculating scores",leave=False,total=len(similarityDictionary)):
-        fromDegree = leftDegrees[fromIndex]
-        toDegree = leftDegrees[toIndex]
-        # expectedSimilarityCount = realizations 
-        # if(fromIndex ==toIndex):
-        
-        degreeEdge = (min(fromDegree, toDegree), max(fromDegree, toDegree))
-        similarities = degreePair2similarity[degreeEdge]
-        if(shouldCalculatePvalues):
-            totalSimilarities = len(similarities)
-            similaritiesAbove = np.sum(similarities>=originalSimilarity)
-            pvalue = similaritiesAbove/totalSimilarities
-            resultPValues.append(pvalue)
-        elif(shouldCalculatePvaluesQuantized):
-            pvalue = 1.0
-            for index, threshold in enumerate(precalculatedThresholds): 
-                if(originalSimilarity>threshold[degreeEdge]):
-                    pvalue = pvaluesQuantized[index]
-                    break
-            resultPValues.append(pvalue)
-        if(shouldCalculateZscores):
-            mean = precalculatedMeans[degreeEdge]
-            std = precalculatedSTDs[degreeEdge]
-            zscore = (originalSimilarity-mean)/std
-            resultZScores.append(zscore)
+    for (fromIndex, toIndex), originalSimilarity in zip(similarityDataIndices, similarityDataValues):
         resultsIndexedEdges.append((fromIndex, toIndex))
         resultSimilarities.append(originalSimilarity)
-        
     returnValues["indexedEdges"] = resultsIndexedEdges
     returnValues["similarities"] = resultSimilarities
+
+    # calculate quantiles
     if("quantile" in scoreTypes):
         # will calculate the quantiles, i.e., how many similarities are above each similarity value
         # (for each pair in resultSimilarities)
@@ -634,17 +564,15 @@ def bipartiteNullModelSimilarity(
         rank = rankdata(resultSimilarities, method="max")
         returnValues["quantilesimilarities"] = ((pairsCount-len(rank)+rank)/pairsCount)*resultSimilarities
 
-
-    if(shouldCalculatePvalues or shouldCalculatePvaluesQuantized):
-        returnValues["pvalues"] = resultPValues
-        returnValues["pvaluesQuantized"] = shouldCalculatePvaluesQuantized
-    if(shouldCalculateZscores):
-        returnValues["zscores"] = resultZScores
-    
-    returnValues["labels"] = leftIndex2Label
-    if(returnDegreeSimilarities):
-        returnValues["nullmodelDegreePairsSimilarities"] = degreePair2similarity
+        # print(f"LeftCount: {pairsCount} len(resultSimilarities): {len(resultSimilarities)}")
     if(returnDegreeValues):
         returnValues["degrees"] = leftDegrees
+    returnValues["labels"] = leftIndex2Label
+
+    if(shouldCalculatePvalues and realizations>0):
+        returnValues["pvalues"] = similarityPValues
+    
+    if(returnDegreeSimilarities):
+        returnValues["nullmodelDegreePairsSimilarities"] = degreePair2similarityComplete
     return returnValues
 

@@ -83,10 +83,7 @@ if __name__ == "__main__": # Needed for parallel processing
 
     bipartiteEdges += list(filteredBipartiteEdges)
 
-    # scoreType = ["zscore","pvalue"]
-    scoreType = ["zscore","pvalue-quantized"]
-    # pvalue-quantized is faster than pvalue
-    # but pvalues are quantized
+    scoreType = ["pvalue"]
 
     # creates a null model output from the bipartite graph
     nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
@@ -95,8 +92,6 @@ if __name__ == "__main__": # Needed for parallel processing
         realizations=1000, # number of realizations of the null model, use 0 for no null model
         batchSize=10, # number of realizations to calculate in each process
         minSimilarity = 0.1, # will first filter out similarities below this value
-        pvaluesQuantized=[0.001,0.005,0.01,0.05,0.1,0.25,0.5],
-        # for pvalue-quantized, you can define the p-values of interest
         idf="none", # None, "none", "linear", "smoothlinear", "log", "smoothlog"
         workers=-1, # -1 to use all available cores, 0 or 1 to use a single core
         returnDegreeSimilarities=True, # will also return the similarities by degree pair
@@ -114,15 +109,10 @@ if __name__ == "__main__": # Needed for parallel processing
     if("pvalues" in nullModelOutput):
         nullModelPvalues = nullModelOutput["pvalues"]
 
-    nullModelZScores = None
-    # zscores same order as indexedEdges (if zcores was requested)
-    if("zscores" in nullModelOutput):
-        nullModelZScores = nullModelOutput["zscores"]
-
     # labels for the nodes
     labels = nullModelOutput["labels"]
 
-    # Print the indexed edges and their similarities together with pvalues and zscores
+    # Print the indexed edges and their similarities together with pvalues
     for i, (edge, similarity) in enumerate(zip(nullModelIndexedEdges, nullModelSimilarities)):
         labelledEdge = (labels[edge[0]],labels[edge[1]])
         if(not labelledEdge[0].startswith("user") or not labelledEdge[1].startswith("user")):
@@ -132,16 +122,9 @@ if __name__ == "__main__": # Needed for parallel processing
 
         if(nullModelPvalues):
             pvalue = nullModelPvalues[i]
-            if("pvalue-quantized" in scoreType):
-                pvalueString = f"(p<{pvalue:.2g})"
-            else:
-                pvalueString = f"(p={pvalue:.2g})"
+            pvalueString = f"(p={pvalue:.2g})"
             printStringList.append(pvalueString)
         
-        if(nullModelZScores):
-            zscore = nullModelZScores[i]
-            zscoreString = f"(z={zscore:.2g})"
-            printStringList.append(zscoreString)
         print(' '.join(printStringList))
     print("")
     

@@ -16,6 +16,7 @@ import argparse
 import shutil
 import json
 import pickle
+import multiprocessing as mp
 
 
 # sampled_twitter_en_tl_global_0908
@@ -27,7 +28,8 @@ import pickle
 
 if __name__ == "__main__": # Needed for parallel processing
 
-    dataName = "sampled_20240226"
+    mp.set_start_method('spawn')
+    dataName = "hamas_israel_challenge_problem_all_20240229"
     indicators = ["coretweet","cohashtag","courl","coretweetusers"]
     tweetIDTextCache = {}
     dataNameHelp = """Name of the dataset. A file named <dataName>.csv should be in the preprocessed datasets folder.
@@ -115,6 +117,20 @@ if __name__ == "__main__": # Needed for parallel processing
             parameters = {}
         return czind.obtainBipartiteEdgesTextSimilarity(df, dataName, **parameters)
 
+    def external_bipartite(filePath):
+        # 
+        edges = []
+        with open(filePath,"r") as f:
+            for line in f:
+                tokens = line.strip().split(" ")
+                user = tokens[1]
+                multiplicity = int(tokens[2])
+                for i in range(multiplicity):
+                    edges.append((user,tokens[0]))
+        return edges
+
+
+
     # Available indicators
     bipartiteMethod = {
         "coretweet": czind.obtainBipartiteEdgesRetweets,
@@ -122,7 +138,7 @@ if __name__ == "__main__": # Needed for parallel processing
         "courl": czind.obtainBipartiteEdgesURLs,
         "coretweetusers": czind.obtainBipartiteEdgesRetweetsUsers,
         "coword": czind.obtainBipartiteEdgesWords,
-        "textsimilarity": text_similarity_partial
+        "textsimilarity": text_similarity_partial,
     }
 
     runParameters = czind.parseParameters(config,indicators)
@@ -147,15 +163,32 @@ if __name__ == "__main__": # Needed for parallel processing
             import coordinationz.usc_text_similarity as cztext
             g = cztext.text_similarity(dfFiltered)
         else:
-            bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
+            if(networkName.startswith("external")):
+                # external:filename.txt
+                # networkName will be ext_filename.stem
+                filePath = Path(networkName.split(":")[1])
+                # networkName = "ext_"+filePath.stem
+                allowedUsers = set(dfFiltered.user_id)
+                bipartiteEdges = external_bipartite(filePath)
+                bipartiteEdges = [(user,item) for user,item in bipartiteEdges if user in allowedUsers]
+                
+                # add networkName to the runParameters["filter"], runParameters["nullmodel"] and runParameters["network"]
+            else:
+                bipartiteEdges = bipartiteMethod[networkName](dfFiltered)
+            
+            
+            print(f"Filtering the the nodes in the bipartite network...")
+            bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
+
             if(len(bipartiteEdges)==0):
                 print(f"\n-------\nWARNING: No {networkName} edges found.\n-------\n")
                 continue
-            
-            bipartiteEdges = czind.filterNodes(bipartiteEdges,**runParameters["filter"][networkName])
-            # (user_ids, items)
-            allUsers.update(set([userid for userid,_ in bipartiteEdges]))
 
+            # (user_ids, items)
+            currentNodes = set([userid for userid,_ in bipartiteEdges])
+
+            allUsers.update(currentNodes)
+        
             if(len(bipartiteEdges)==0):
                 print(f"\n-------\nWARNING: No {networkName} edges found after filtering.\n-------\n")
                 continue
@@ -163,6 +196,16 @@ if __name__ == "__main__": # Needed for parallel processing
             
             # bipartiteEdges.to_csv(networksPath/f"{dataName}_{networkName}_bipartiteEdges.csv", index=False)
             # creates a null model output from the bipartite graph
+            # save the parameters used to create the null model into a pickle file
+            print(f"Creating the null model for the {networkName} network...")
+            # with open(networksPath/f"{dataName}_{networkName}_nullmodel_parameters.pkl", "wb") as f:
+            #     toSaveData = runParameters["nullmodel"][networkName].copy()
+            #     toSaveData["bipartiteEdges"] = bipartiteEdges
+            #     toSaveData["returnDegreeSimilarities"] = False
+            #     toSaveData["returnDegreeValues"] = True
+            #     toSaveData["filterNodesParameters"] = runParameters["filter"][networkName]
+            #     pickle.dump(toSaveData, f,protocol=pickle.HIGHEST_PROTOCOL)
+            
             nullModelOutput = cz.nullmodel.bipartiteNullModelSimilarity(
                 bipartiteEdges,
                 returnDegreeSimilarities=False, # will return the similarities of the nodes
@@ -182,7 +225,7 @@ if __name__ == "__main__": # Needed for parallel processing
             user2category = dict(dfFiltered[["user_id","category"]].drop_duplicates().values)
             g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
-        g = cznet.removeSingletons(g)
+        # g = cznet.removeSingletons(g)
 
         gThresholded = cznet.thresholdNetwork(g, **runParameters["threshold"][networkName])
 
@@ -190,21 +233,33 @@ if __name__ == "__main__": # Needed for parallel processing
             for key in extraProperties:
                 gThresholded.vs[key] = [extraProperties[key].get(user,"None") for user in gThresholded.vs["Label"]]
 
+        if(gThresholded.vcount()==0 or gThresholded.ecount()==0):
+            print(f"\n-------\nWARNING: No {networkName} nodes or edges found after thresholding.\n-------\n")
+            continue
         xn.save(gThresholded, networksPath/f"{dataName}_{suffix}_{networkName}.xnet")
         generatedNetworks[networkName] = gThresholded
         
+
+        gForTable = gThresholded
         if("community" in runParameters and runParameters["community"]["detectCommunity"]):
             print(f"Finding communities in the {networkName} network...")
             gCommunities = czcom.getNetworksWithCommunities(gThresholded.copy()) #**runParameters["communities"][networkName]
-            if(runParameters["community"]["computeCommunityLabels"]):
-                print(f"Computing community labels for the {networkName} network...")
-                gCommunities = czcom.labelCommunities(df,gCommunities,tweetIDTextCache)
+            # if(runParameters["community"]["computeCommunityLabels"]):
+            #     print(f"Computing community labels for the {networkName} network...")
+            #     gCommunities = czcom.labelCommunities(df,gCommunities,tweetIDTextCache)
             xn.save(gCommunities, networksPath/f"{dataName}_{suffix}_{networkName}_community.xnet")
+            gForTable = gCommunities
+
+        
+        networkTables = cznet.getNetworkTables(gForTable, currentNodes)
+        networkTables["nodes"].to_csv(tablesPath/f"{dataName}_{suffix}_{networkName}_nodes.csv",index=False)
+        networkTables["edges"].to_csv(tablesPath/f"{dataName}_{suffix}_{networkName}_edges.csv",index=False)
+
     
     print(f"Merging networks...")
     # mergingMethod = runParameters["merging"]["method"]
     # del runParameters["merging"]["method"]
-    mergedNetwork = czind.mergeNetworks(generatedNetworks,
+    originalMergedNetwork = czind.mergeNetworks(generatedNetworks,
                                         **runParameters["merging"])
     
 
@@ -213,7 +268,7 @@ if __name__ == "__main__": # Needed for parallel processing
         thresholdOptions = {}
         thresholdOptions[thresholdAttribute] = threshold
 
-        mergedNetwork = cznet.thresholdNetwork(mergedNetwork,thresholdOptions)
+        mergedNetwork = cznet.thresholdNetwork(originalMergedNetwork,thresholdOptions)
         
         if("community" in runParameters and runParameters["community"]["detectCommunity"]):
             print(f"Finding communities in the merged network...")
@@ -226,9 +281,13 @@ if __name__ == "__main__": # Needed for parallel processing
             mergedNetwork = cznet.thresholdNetwork(mergedNetwork,runParameters["output"]["extraThresholds"])
         
         xn.save(mergedNetwork, networksPath/f"{dataName}_{suffix}_merged_{threshold}.xnet")
+        networkTables = cznet.getNetworkTables(mergedNetwork, allUsers)
+        networkTables["nodes"].to_csv(tablesPath/f"{dataName}_{suffix}_merged_nodes_{threshold}.csv",index=False)
+        networkTables["edges"].to_csv(tablesPath/f"{dataName}_{suffix}_merged_edges_{threshold}.csv",index=False)
 
         
         print(f"Saving data...")
+        # allUsers = set(df["user_id"].values)
         incasOutput = czind.generateEdgesINCASOutput(mergedNetwork, allUsers,
                                                     rankingAttribute = thresholdAttribute)
         
