@@ -2,15 +2,7 @@ from pathlib import Path
 import numpy as np
 import emoji
 import re
-
-try:
-    from sentence_transformers import SentenceTransformer
-except:
-    # raise new exception instructing user to install sentence_transformers
-    message = "Please install the sentence_transformers package"
-    message+= " by running the following command:\n\n"
-    message+= "pip install sentence-transformers"
-    raise ImportError(message)
+from sklearn.cluster import MiniBatchKMeans
 
 try:
     from pynndescent import NNDescent
@@ -52,6 +44,15 @@ def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-
             sentence_embeddings = cache["embeddings"]
 
             return embed_keys, sentence_embeddings
+            
+    try:
+        from sentence_transformers import SentenceTransformer
+    except:
+        # raise new exception instructing user to install sentence_transformers
+        message = "Please install the sentence_transformers package"
+        message+= " by running the following command:\n\n"
+        message+= "pip install sentence-transformers"
+        raise ImportError(message)
 
 
     tweets = df[column].unique().tolist()
@@ -82,12 +83,14 @@ def filter_active(df, embed_keys, sentence_embeddings, min_activity=10, column="
 
     return embed_keys, sentence_embeddings
 
-def get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=5000, column="text", seed=9999):
+def get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=2000, column="text", seed=9999, workers=64):
     # get a random sample
-    idx = np.arange(len(embed_keys))
-    rng = np.random.default_rng(seed)
-    rng.shuffle(idx)
-    centroids = sentence_embeddings[idx[:n_buckets]]
+    #idx = np.arange(len(embed_keys))
+    #rng = np.random.default_rng(seed)
+    #rng.shuffle(idx)
+    #centroids = sentence_embeddings[idx[:n_buckets]]
+
+    centroids = MiniBatchKMeans(n_clusters=n_buckets, batch_size=256 * workers, random_state=seed).fit(sentence_embeddings).cluster_centers_
 
     # find the nearest centroid for each tweet
     index = NNDescent(centroids, n_neighbors=100, low_memory=False, diversify_prob=0.0, random_state=seed)
