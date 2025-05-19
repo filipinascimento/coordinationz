@@ -90,15 +90,17 @@ def get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=2000, column="t
     #rng.shuffle(idx)
     #centroids = sentence_embeddings[idx[:n_buckets]]
 
-    centroids = MiniBatchKMeans(n_clusters=n_buckets, batch_size=256 * workers, random_state=seed).fit(sentence_embeddings).cluster_centers_
+    #centroids = MiniBatchKMeans(n_clusters=n_buckets, batch_size=256 * workers, random_state=seed).fit(sentence_embeddings).cluster_centers_
 
     # find the nearest centroid for each tweet
-    index = NNDescent(centroids, n_neighbors=100, low_memory=False, diversify_prob=0.0, random_state=seed)
-    index.prepare()
+    #index = NNDescent(centroids, n_neighbors=100, low_memory=False, diversify_prob=0.0, random_state=seed)
+    #index.prepare()
 
-    buckets, _ = index.query(sentence_embeddings, k=1, epsilon=0.3)
+    buckets = MiniBatchKMeans(n_clusters=n_buckets, batch_size=256 * workers, random_state=seed).fit_predict(sentence_embeddings)
+    #buckets, _ = index.query(sentence_embeddings, k=1, epsilon=0.3)
 
-    table = {tweet: b for tweet, b in zip(embed_keys, buckets.squeeze(-1))}
+    table = {tweet: b for tweet, b in zip(embed_keys, buckets)}
+    #table = {tweet: b for tweet, b in zip(embed_keys, buckets.squeeze(-1))}
 
     # convert to bipartite network
     df = df[["user_id", column]].copy()
