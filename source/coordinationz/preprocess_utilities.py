@@ -336,13 +336,27 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
 
 
     # merge mentions and user_mentions
-    df["data_mentions"] = df["data_mentions"].combine_first(df["data_user_mentions"])
-    # created_at data format: Fri Jul 31 23:56:25 +0000 2020
-    df["data_created_at"] = pd.to_datetime(df["data_created_at"], format='%a %b %d %H:%M:%S %z %Y')
-    # same for data_tweet_time but that format: 2014-07-17 00:36
-    df["data_tweet_time"] = pd.to_datetime(df["data_tweet_time"], format='%Y-%m-%d %H:%M')
+    if "data_mentions" in df.columns:
+        df["data_mentions"] = df["data_mentions"].combine_first(df["data_user_mentions"])
+    else:
+        df["data_mentions"] = df["data_user_mentions"]
+    
+
+    # data_created_at data format: Fri Jul 31 23:56:25 +0000 2020
+    if "data_created_at" in df.columns:
+        df["data_created_at"] = pd.to_datetime(df["data_created_at"], format='%a %b %d %H:%M:%S %z %Y')
+
+    # same for data_tweet_time but two formats: 2014-07-17 00:36 or Fri Jul 31 23:56:25 +0000 2020
+    if "data_tweet_time" in df.columns:
+        mask = df["data_tweet_time"].str.contains("+", regex=False)
+        df.loc[~mask, "data_tweet_time"] = pd.to_datetime(df.loc[~mask, "data_tweet_time"], format='%Y-%m-%d %H:%M')
+        df.loc[mask, "data_tweet_time"] = pd.to_datetime(df.loc[mask, "data_tweet_time"], format='%a %b %d %H:%M:%S %z %Y')
+
     # merge the data_creation_date and data_tweet_time
-    df["data_created_at"] = df["data_created_at"].combine_first(df["data_tweet_time"])
+    if "data_created_at" in df.columns and "data_tweet_time" in df.columns:
+        df["data_created_at"] = df["data_created_at"].combine_first(df["data_tweet_time"])
+    elif "data_tweet_time" in df.columns:
+        df["data_created_at"] = df["data_tweet_time"]
 
     # normalize hashtags (string mixed with lists)
     # use evaluate literal if it is a string
@@ -358,11 +372,16 @@ def preprocessIOData(dataName,dataPath, preprocessedFilePath, flavors = ["io","c
     
     # replace None in quoted_tweet_tweetid, in_reply_to_tweetid, and retweet_tweetid with NaN
     df["data_in_reply_to_tweetid"] = df["data_in_reply_to_tweetid"].replace({None: pd.NA})
-    df["data_quoted_tweet_tweetid"] = df["data_quoted_tweet_tweetid"].replace({None: pd.NA})
     df["data_retweet_tweetid"] = df["data_retweet_tweetid"].replace({None: pd.NA})
     df["data_in_reply_to_tweetid"] = df["data_in_reply_to_tweetid"].replace({"None": pd.NA})
-    df["data_quoted_tweet_tweetid"] = df["data_quoted_tweet_tweetid"].replace({"None": pd.NA})
     df["data_retweet_tweetid"] = df["data_retweet_tweetid"].replace({"None": pd.NA})
+
+    # one dataset lacks quotes
+    if "data_quoted_tweet_tweetid" in df.columns:
+        df["data_quoted_tweet_tweetid"] = df["data_quoted_tweet_tweetid"].replace({None: pd.NA})
+        df["data_quoted_tweet_tweetid"] = df["data_quoted_tweet_tweetid"].replace({"None": pd.NA})
+    else:
+        df["data_quoted_tweet_tweetid"] = pd.NA
 
     # repeat for userid
     df["data_in_reply_to_userid"] = df["data_in_reply_to_userid"].replace({None: pd.NA})
