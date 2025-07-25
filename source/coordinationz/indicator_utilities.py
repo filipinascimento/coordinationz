@@ -201,7 +201,14 @@ def obtainBipartiteEdgesWords(df,removeRetweets=True,removeQuotes=False,removeRe
 
 def obtainBipartiteEdgesTextSimilarity(df, data_name, n_buckets=2000, min_activity=10, column="text", model="paraphrase-multilingual-MiniLM-L12-v2", cache_path=None, seed=9999, **kwargs):
     from . import textsimilarity_helper as ts
-    embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path)
+    
+    if model.lower() == "tf-idf":
+        print(f"Using TF-IDF mode...")
+        embed_keys, sentence_embeddings = ts.get_embeddings_tf_idf(df, column=column, **kwargs)
+    else:
+        print(f"Using {model}...")
+        embed_keys, sentence_embeddings = ts.get_embeddings(df, data_name, column=column, model=model, cache_path=cache_path, **kwargs)
+    
     embed_keys, sentence_embeddings = ts.filter_active(df, embed_keys, sentence_embeddings, min_activity=min_activity, column=column)
 
     bipartite_edges = ts.get_bipartite(df, embed_keys, sentence_embeddings, n_buckets=n_buckets, seed=seed)

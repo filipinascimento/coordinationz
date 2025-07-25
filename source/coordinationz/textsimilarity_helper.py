@@ -3,15 +3,18 @@ import numpy as np
 import emoji
 import re
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
+from sklearn.preprocessing import Normalizer
 
-try:
-    from pynndescent import NNDescent
-except:
-    # raise new exception instructing user to install sentence_transformers
-    message = "Please install the pynndescent package"
-    message+= " by running the following command:\n\n"
-    message+= "pip install pynndescent"
-    raise ImportError(message)
+#try:
+#    from pynndescent import NNDescent
+#except:
+#    # raise new exception instructing user to install sentence_transformers
+#    message = "Please install the pynndescent package"
+#    message+= " by running the following command:\n\n"
+#    message+= "pip install pynndescent"
+#    raise ImportError(message)
 
 
 def preprocess_tweet(tweet):
@@ -59,10 +62,20 @@ def get_embeddings(df, data_name, column="text", model="paraphrase-multilingual-
     processed = list(map(preprocess_tweet, tweets))
 
     model = SentenceTransformer(model, device="cuda")
-    sentence_embeddings = model.encode(processed, show_progress_bar=True)
+    sentence_embeddings = model.encode(processed, show_progress_bar=True, normalize_embeddings=True)
     
     if cache_path is not None:
         np.savez_compressed(cache_path, keys=tweets, embeddings=sentence_embeddings)
+
+    return tweets, sentence_embeddings
+
+def get_embeddings_tf_idf(df, column="text", features=256):
+    tweets = df[column].unique().tolist()
+    processed = list(map(preprocess_tweet, tweets))
+
+    tf_idf = TfidfVectorizer(min_df=10).fit_transform(processed)
+    lsa = TruncatedSVD(n_components=features).fit_transform(tf_idf)
+    sentence_embeddings = Normalizer().fit_transform(lsa)
 
     return tweets, sentence_embeddings
 
