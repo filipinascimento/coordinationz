@@ -147,6 +147,16 @@ if __name__ == "__main__": # Needed for parallel processing
     # # Loads data from the evaluation datasets as pandas dataframes
     df = czpre.loadPreprocessedData(dataName, config=config)
 
+    # perform runtime preprocessing
+    preprocessMethod = {
+        "filterByTokens": czpre.filterByTokens,
+    }
+
+    if "preprocess" in config and config["preprocess"] is not None:
+        for preprocess in config["preprocess"]:
+            print(f"Running {preprocess}...")
+            df = preprocessMethod[preprocess](df, **config["preprocess"][preprocess])
+
     # creates a null model output from the bipartite graph
 
     if(not suffix): 

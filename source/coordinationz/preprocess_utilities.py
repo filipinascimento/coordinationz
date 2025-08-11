@@ -9,6 +9,7 @@ from . import config
 from pathlib import Path
 import csv
 import unalix
+import re
 
 dropped_columns = [
     "author",
@@ -94,6 +95,10 @@ def loadPreprocessedData(dataName,config=config,**kwargs):
 
     return df
 
+def filterByTokens(df, tokens, case=True):
+    print(f"Removing tweets with tokens: " + ", ".join(tokens) + "...")
+    pattern = "|".join(map(re.escape, tokens))
+    return df[~df["text"].str.contains(pattern, case=case, na=False)]
 
 
 def generateReport(df):
