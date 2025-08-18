@@ -95,10 +95,17 @@ def loadPreprocessedData(dataName,config=config,**kwargs):
 
     return df
 
-def filterByTokens(df, tokens, case=True):
-    print(f"Removing tweets with tokens: " + ", ".join(tokens) + "...")
+def filterByTokens(df, tokens, case=True, user=False):
     pattern = "|".join(map(re.escape, tokens))
-    return df[~df["text"].str.contains(pattern, case=case, na=False)]
+    mask = df["text"].str.contains(pattern, case=case, na=False)
+    
+    if user:
+        print(f"Removing users with tweets with tokens: " + ", ".join(tokens) + "...")
+        spam_users = set(df["user_id"][mask])
+        return df[~df["user_id"].isin(spam_users)]
+    else:
+        print(f"Removing tweets with tokens: " + ", ".join(tokens) + "...")
+        return df[~mask]
 
 
 def generateReport(df):
