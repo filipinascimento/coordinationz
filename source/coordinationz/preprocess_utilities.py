@@ -106,7 +106,32 @@ def filterByTokens(df, tokens, case=True, user=False):
     else:
         print(f"Removing tweets with tokens: " + ", ".join(tokens) + "...")
         return df[~mask]
+    
+def filterToBalance(df, minUserActivities=1, seed=9999):
+    if minUserActivities > 1:
+        activity_counts = df["user_id"].value_counts()
+        active_users = set(activity_counts[activity_counts >= minUserActivities].index)
+        df = df[df["user_id"].isin(active_users)]
 
+    io_users = df[df["category"] == "io"]["user_id"].drop_duplicates()
+    control_users = df[df["category"] == "control"]["user_id"].drop_duplicates()
+
+    if minUserActivities > 1:
+        print(f"Found {len(control_users)} control users and {len(io_users)} io users after filtering.")
+    else:
+        print(f"Found {len(control_users)} control users and {len(io_users)} io users.")
+
+    if len(control_users) > len(io_users):
+        print("Sampling control users...")
+        to_remove = set(control_users.sample(n=len(control_users) - len(io_users), random_state=seed))
+        return df[~df["user_id"].isin(to_remove)]
+    if len(control_users) < len(io_users):
+        print("Sampling io users...")
+        to_remove = set(io_users.sample(n=len(io_users) - len(control_users), random_state=seed))
+        return df[~df["user_id"].isin(to_remove)]
+    
+    print("Both categories are already balanced, skipping sampling")
+    return df
 
 def generateReport(df):
     numTweets = len(df)

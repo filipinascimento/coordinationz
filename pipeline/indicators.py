@@ -150,6 +150,7 @@ if __name__ == "__main__": # Needed for parallel processing
     # perform runtime preprocessing
     preprocessMethod = {
         "filterByTokens": czpre.filterByTokens,
+        "filterToBalance": czpre.filterToBalance,
     }
 
     if "preprocess" in config and config["preprocess"] is not None:
