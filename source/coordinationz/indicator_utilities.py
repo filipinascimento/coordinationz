@@ -552,21 +552,17 @@ def mergeNetworks(networksDictionary,
             nodeAttributes = {key:[] for key in network.vs.attributes()}
         if not edgeAttributes:
             edgeAttributes = {key:[] for key in network.es.attributes()}
+
+        # add all labels to label2Index and index2Label
+        for i, label in enumerate(labels):
+            if label not in label2Index:
+                label2Index[label] = len(label2Index)
+                for key in nodeAttributes:
+                    if key in network.vs.attributes():
+                        nodeAttributes[key].append(network.vs[i][key])
         for edgeIndex,(fromIndex, toIndex) in enumerate(network.get_edgelist()):
             fromLabel = labels[fromIndex]
             toLabel = labels[toIndex]
-            if fromLabel not in label2Index:
-                label2Index[fromLabel] = len(label2Index)
-                index2Label[len(index2Label)] = fromLabel
-                for key in nodeAttributes:
-                    if key in network.vs.attributes():
-                        nodeAttributes[key].append(network.vs[fromIndex][key])
-            if toLabel not in label2Index:
-                label2Index[toLabel] = len(label2Index)
-                index2Label[len(index2Label)] = toLabel
-                for key in nodeAttributes:
-                    if key in network.vs.attributes():
-                        nodeAttributes[key].append(network.vs[toIndex][key])
             edges.append((label2Index[fromLabel], label2Index[toLabel]))
             edgeType.append(networkType)
             for key in edgeAttributes:

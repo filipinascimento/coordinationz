@@ -383,6 +383,7 @@ if __name__ == "__main__": # Needed for parallel processing
     thresholdAttribute = runParameters["output"]["thresholdAttribute"]
     extraFilters = runParameters["output"]["filters"].copy()
     extraFilters["nofilter"] = []
+    
 
     for threshold in runParameters["output"]["thresholds"]:
         for filterName, filterDefinition in extraFilters.items():
