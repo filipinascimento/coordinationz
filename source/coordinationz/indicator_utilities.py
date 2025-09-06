@@ -35,6 +35,7 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             # len(urls) should be >0
             userActivityCount = df[df["urls"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        # TODO: include retweet users
         else:
             # activity not retweet
             userActivityCount = df["user_id"].value_counts()
@@ -152,11 +153,16 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
     text = re.sub(r'<.*?>', ' ', text)  # Remove HTML tags
     text = remove_emoji(text)  # Remove emoji
     text = re.sub(r'#\w+', ' ', text)  # Remove hashtags
-    text = text.lstrip('RT')  # Remove RT word
+    if text.startswith("RT"):
+        text = text[2:]
+
 
     # Use spaCy to tokenize and lemmatize
     doc = nlp(text)
     tokens = [token.lemma_ for token in doc if token.lemma_.lower() not in stopword_set and not token.is_punct and not token.is_space]
+    # remove tokens that have only one or two characters
+    tokens = [token for token in tokens if len(token) > 2]
+
     # Include n-grams of size defined by ngram_range
     ngrams = []
     for n in range(ngram_range[0], ngram_range[1] + 1):
@@ -478,6 +484,7 @@ def parseParameters(config,indicators):
         "thresholdAttribute": ("thresholdAttribute","quantile"),
         "thresholds": ("thresholds",[0.95,0.99]),
         "extraThresholds": ("extraThresholds",{}),
+        "filters": ("filters",{}),
     }
 
     generalOutputOptions = {}
@@ -486,6 +493,7 @@ def parseParameters(config,indicators):
             generalOutputOptions[param] = outputConfig[key]
         else:
             generalOutputOptions[param] = default
+    
 
     returnValue = {}
     returnValue["user"] = specificUserFilterOptions
@@ -544,21 +552,17 @@ def mergeNetworks(networksDictionary,
             nodeAttributes = {key:[] for key in network.vs.attributes()}
         if not edgeAttributes:
             edgeAttributes = {key:[] for key in network.es.attributes()}
+
+        # add all labels to label2Index and index2Label
+        for i, label in enumerate(labels):
+            if label not in label2Index:
+                label2Index[label] = len(label2Index)
+                for key in nodeAttributes:
+                    if key in network.vs.attributes():
+                        nodeAttributes[key].append(network.vs[i][key])
         for edgeIndex,(fromIndex, toIndex) in enumerate(network.get_edgelist()):
             fromLabel = labels[fromIndex]
             toLabel = labels[toIndex]
-            if fromLabel not in label2Index:
-                label2Index[fromLabel] = len(label2Index)
-                index2Label[len(index2Label)] = fromLabel
-                for key in nodeAttributes:
-                    if key in network.vs.attributes():
-                        nodeAttributes[key].append(network.vs[fromIndex][key])
-            if toLabel not in label2Index:
-                label2Index[toLabel] = len(label2Index)
-                index2Label[len(index2Label)] = toLabel
-                for key in nodeAttributes:
-                    if key in network.vs.attributes():
-                        nodeAttributes[key].append(network.vs[toIndex][key])
             edges.append((label2Index[fromLabel], label2Index[toLabel]))
             edgeType.append(networkType)
             for key in edgeAttributes:
