@@ -88,7 +88,12 @@ def getTokens(tweetID,text,tweetID2Tokens):
     tweetID2Tokens[tweetID] = tokens
     return tokens
 
-def labelCommunities(df, g, tweetID2TokensCache = {}):
+
+
+def labelCommunities(df, g, tweetID2TokensCache = None):
+    if tweetID2TokensCache is None:
+        tweetID2TokensCache = {}
+        # tweetID2TokensCache is used as cache across different calls
     df = df.copy()
     df["contentText"] = df["text"]
     if("data_translatedContentText" in df and not df["data_translatedContentText"].isna().all()):
@@ -110,7 +115,7 @@ def labelCommunities(df, g, tweetID2TokensCache = {}):
     dfInNetworkRetweets = dfRetweets.dropna(subset=["linked_tweet"])
     # for tokens use czind.tokenizeTweet(string)
 
-    dfInNetworkTokens = dfOriginal.dropna(subset=["contentText"])
+    dfInNetworkTokens = dfOriginal.dropna(subset=["contentText"]).copy()
     # use translated 
     # apply getTokens to text, tweet_id
     dfInNetworkTokens["tokens"] = dfInNetworkTokens[["tweet_id","contentText"]].progress_apply(lambda x: getTokens(*x,tweetID2TokensCache),axis=1)
@@ -138,7 +143,7 @@ def labelCommunities(df, g, tweetID2TokensCache = {}):
     tokenSumCount = 0
     retweetTokenSumCount = 0
 
-    penaltyFactor = 3
+    penaltyFactor = 2
     transform = lambda x: x
     # transform = lambda x: np.log(x+1)
 

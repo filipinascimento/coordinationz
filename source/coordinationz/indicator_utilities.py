@@ -35,6 +35,7 @@ def filterUsersByMinActivities(df, minUserActivities=1, activityType="any"):
             # len(urls) should be >0
             userActivityCount = df[df["urls"].apply(lambda x: len(x) > 0)]["user_id"].value_counts()
             usersWithMinActivities = set(userActivityCount[userActivityCount >= minUserActivities].index)
+        # TODO: include retweet users
         else:
             # activity not retweet
             userActivityCount = df["user_id"].value_counts()
@@ -152,11 +153,16 @@ def tokenizeTweet(text, ngram_range=(1, 2)):
     text = re.sub(r'<.*?>', ' ', text)  # Remove HTML tags
     text = remove_emoji(text)  # Remove emoji
     text = re.sub(r'#\w+', ' ', text)  # Remove hashtags
-    text = text.lstrip('RT')  # Remove RT word
+    if text.startswith("RT"):
+        text = text[2:]
+
 
     # Use spaCy to tokenize and lemmatize
     doc = nlp(text)
     tokens = [token.lemma_ for token in doc if token.lemma_.lower() not in stopword_set and not token.is_punct and not token.is_space]
+    # remove tokens that have only one or two characters
+    tokens = [token for token in tokens if len(token) > 2]
+
     # Include n-grams of size defined by ngram_range
     ngrams = []
     for n in range(ngram_range[0], ngram_range[1] + 1):
@@ -478,6 +484,7 @@ def parseParameters(config,indicators):
         "thresholdAttribute": ("thresholdAttribute","quantile"),
         "thresholds": ("thresholds",[0.95,0.99]),
         "extraThresholds": ("extraThresholds",{}),
+        "filters": ("filters",{}),
     }
 
     generalOutputOptions = {}
@@ -486,6 +493,7 @@ def parseParameters(config,indicators):
             generalOutputOptions[param] = outputConfig[key]
         else:
             generalOutputOptions[param] = default
+    
 
     returnValue = {}
     returnValue["user"] = specificUserFilterOptions
