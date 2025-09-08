@@ -64,6 +64,7 @@ def _processBatch(parameters):
                 weights = allWeights[choiceIndices]
             else:
                 weights = None
+            
             # FIXME: Incude the option to choose the similarity metric
             # or to send a custom function
             modelSimilarityDictionary={}
@@ -483,7 +484,7 @@ def bipartiteNullModelSimilarity(
                     
                     realizationBatchIndex+=1
                     if returnDegreeSimilarities:
-                        print("Returning Degree Similarities")
+                        # print("Returning Degree Similarities")
                         if(degreePair not in degreePair2similarityComplete):
                             degreePair2similarityComplete[degreePair] = []
                         degreePair2similarityComplete[degreePair].extend(nullModelSimilarities)
