@@ -426,6 +426,7 @@ def parseParameters(config,indicators):
         "minSimilarity":("minSimilarity",0.1),
         "batchSize":("batchSize",10),
         "workers":("workers",10),
+        "normalizeRealizationsPerDegreePair": ("normalizeRealizationsPerDegreePair", True),
     }
 
     generalNullModelOptions = {}
@@ -745,5 +746,4 @@ def suspiciousTables(df,mergedNetwork,
 
         outputs[f"{threshold}"] = {"edges":dfEdges,"filtered":dfFiltered}
     return outputs
-
 
