@@ -1,6 +1,8 @@
 # coordinationz
 Collection of scripts and package to analyze coordination in social media data.
 
+Supported Python versions: 3.10 to 3.12.
+
 To install the package, download the git repository and run the following command in the root directory:
 ```bash
 pip install .
