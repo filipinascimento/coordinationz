@@ -170,3 +170,4 @@ data/
 
 # Will ignore config.toml (Use template)
 config.toml
+/logs

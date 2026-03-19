@@ -66,13 +66,15 @@ def createNetworkFromNullModelOutput(nullModelOutput,
 
     if("quantiles" in nullModelOutput and useQuantileWeights):
         edgeAttributes["weight"] = np.array(nullModelOutput["quantiles"])
-        edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["quantiles"], nan=0.0, posinf=1.0, neginf=0.0)
+        edgeAttributes["weight"] = np.nan_to_num(edgeAttributes["weight"], nan=0.0, posinf=1.0, neginf=0.0)
 
 
     if("pvalues" in nullModelOutput):
         edgeAttributes["pvalue"] = np.array(nullModelOutput["pvalues"])
     if("quantiles" in nullModelOutput):
         edgeAttributes["quantile"] = np.array(nullModelOutput["quantiles"])
+    if("zscores" in nullModelOutput):
+        edgeAttributes["zscore"] = np.array(nullModelOutput["zscores"])
     if("degrees" in nullModelOutput):
         vertexAttributes["left_degree"] = np.array(nullModelOutput["degrees"])
 
@@ -80,7 +82,7 @@ def createNetworkFromNullModelOutput(nullModelOutput,
         progressbar.update(1)
         progressbar.set_description("Applying similarity filters")
     
-    if(similarityThreshold > 0.0 or pvalueThreshold < 1.0):
+    if(similarityThreshold > 0.0 or pvalueThreshold < 1.0 or quantileThreshold > 0.0):
         edgesMask = np.ones(len(edges), dtype=bool)
         if(similarityThreshold > 0.0):
             edgesMask *= edgeAttributes["weight"] > similarityThreshold
@@ -95,6 +97,8 @@ def createNetworkFromNullModelOutput(nullModelOutput,
             edgeAttributes["pvalue"] = edgeAttributes["pvalue"][edgesMask]
         if("quantiles" in nullModelOutput):
             edgeAttributes["quantile"] = edgeAttributes["quantile"][edgesMask]
+        if("zscores" in nullModelOutput):
+            edgeAttributes["zscore"] = edgeAttributes["zscore"][edgesMask]
 
     if(showProgress):
         progressbar.update(1)
