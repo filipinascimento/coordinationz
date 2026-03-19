@@ -1,9 +1,9 @@
 [build-system]
 build-backend = 'mesonpy'
 requires = [
-    'meson-python',
-    'numpy>1.24.0; python_version < "3.9"',
-    'numpy>=2.0.0; python_version >= "3.9"'
+    'meson>=1.3.0',
+    'meson-python>=0.17.0',
+    'numpy>=2.0.0'
     ]
 
 [project]
@@ -23,12 +23,11 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11"
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12"
 ]
-requires-python = ">=3.8.1"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
   "numpy",
@@ -48,9 +47,6 @@ dependencies = [
 Documentation = "https://github.com/filipinascimento/coordinationz"
 Source = "https://github.com/filipinascimento/coordinationz"
 Tracker = "https://github.com/filipinascimento/coordinationz/issues"
-
-[tool.flit.module]
-name = "coordinationz"
 
 [tool.bandit]
 exclude_dirs = ["build","dist","tests","scripts"]
