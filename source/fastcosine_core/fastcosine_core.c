@@ -44,6 +44,101 @@ void capsule_cleanup(PyObject *capsule) {
     free(memory);
 }
 
+CV_INLINE CVBool process_similarity_result(
+	size_t i, size_t j, double similarity, double threshold,
+	int returnDictionary, PyObject *similaritiesDict,
+	npy_int64 **aboveThresholdEdges, double **similarities,
+	size_t *similaritiesCount, size_t *similaritiesCapacity)
+{
+	if (similarity <= threshold) {
+		return CVFalse;
+	}
+
+	if (returnDictionary) {
+		PyObject *leftIndexObj = PyLong_FromSize_t(i);
+		PyObject *rightIndexObj = PyLong_FromSize_t(j);
+		if (leftIndexObj == NULL || rightIndexObj == NULL) {
+			Py_XDECREF(leftIndexObj);
+			Py_XDECREF(rightIndexObj);
+			return CVTrue;
+		}
+
+		PyObject *key = PyTuple_Pack(2, leftIndexObj, rightIndexObj);
+		Py_XDECREF(leftIndexObj);
+		Py_XDECREF(rightIndexObj);
+		if (key == NULL) {
+			return CVTrue;
+		}
+
+		PyObject *value = PyFloat_FromDouble(similarity);
+		if (value == NULL) {
+			Py_XDECREF(key);
+			return CVTrue;
+		}
+
+		if (PyDict_SetItem(similaritiesDict, key, value) < 0) {
+			Py_XDECREF(key);
+			Py_XDECREF(value);
+			return CVTrue;
+		}
+
+		Py_XDECREF(key);
+		Py_XDECREF(value);
+		return CVFalse;
+	}
+
+	if (CVUnlikely(*similaritiesCount == *similaritiesCapacity)) {
+		size_t newCapacity = (*similaritiesCapacity) * 2;
+		npy_int64 *newAboveThresholdEdges = (npy_int64 *)realloc(
+			*aboveThresholdEdges, newCapacity * 2 * sizeof(npy_int64));
+		double *newSimilarities = (double *)realloc(
+			*similarities, newCapacity * sizeof(double));
+		if (newAboveThresholdEdges == NULL || newSimilarities == NULL) {
+			if (newAboveThresholdEdges != NULL) {
+				*aboveThresholdEdges = newAboveThresholdEdges;
+			}
+			if (newSimilarities != NULL) {
+				*similarities = newSimilarities;
+			}
+			PyErr_NoMemory();
+			return CVTrue;
+		}
+		*similaritiesCapacity = newCapacity;
+		*aboveThresholdEdges = newAboveThresholdEdges;
+		*similarities = newSimilarities;
+	}
+
+	(*aboveThresholdEdges)[2 * (*similaritiesCount)] = i;
+	(*aboveThresholdEdges)[2 * (*similaritiesCount) + 1] = j;
+	(*similarities)[*similaritiesCount] = similarity;
+	(*similaritiesCount)++;
+	return CVFalse;
+}
+
+CV_INLINE double compute_dot_product(
+	size_t leftNode1Start, size_t leftNode1End,
+	size_t leftNode2Start, size_t leftNode2End,
+	npy_int64 *uniqueEdges, npy_double *uniqueEdgesWeight)
+{
+	double dotProduct = 0.0;
+	size_t leftNode1Index = leftNode1Start;
+	size_t leftNode2Index = leftNode2Start;
+	while (leftNode1Index < leftNode1End && leftNode2Index < leftNode2End) {
+		npy_int64 rightNode1 = uniqueEdges[2 * leftNode1Index + 1];
+		npy_int64 rightNode2 = uniqueEdges[2 * leftNode2Index + 1];
+		if (rightNode1 == rightNode2) {
+			dotProduct += uniqueEdgesWeight[leftNode1Index] * uniqueEdgesWeight[leftNode2Index];
+			leftNode1Index++;
+			leftNode2Index++;
+		} else if (rightNode1 < rightNode2) {
+			leftNode1Index++;
+		} else {
+			leftNode2Index++;
+		}
+	}
+	return dotProduct;
+}
+
 static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	
 	static char *kwlist[] = {
@@ -69,7 +164,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	int returnDictionary = 0;
 	PyObject *updateCallback = NULL;
 	Py_ssize_t updateInterval = 0;
-	
+
 	if (!PyArg_ParseTupleAndKeywords(
 			args, kwds, "O|OnndOpOn", kwlist, &edgesObject,&weightsObject, &leftCount, &rightCount, &threshold, &leftEdgesObject,&returnDictionary, &updateCallback, &updateInterval)) {
 
@@ -119,10 +214,6 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	npy_float64 *weights = NULL;
 
 	if(weightsObject!=NULL && weightsObject!=Py_None){
-		// printf("Weights provided!\n");
-		// // print using python weightsObject
-		PyObject *weightsRepr = PyObject_Repr(weightsObject);
-
 		// convert weightsObject to numpy array of doubles if needed (will be readonly)
 		if (PyArray_Check(weightsObject)) {
 			// Check if the numpy array is of type double and contiguous
@@ -146,8 +237,6 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 
 		size_t weightsCount = (size_t)PyArray_SIZE(weightsArray);
 		weights = PyArray_DATA(weightsArray);
-		weightsRepr = PyObject_Repr(weightsArray);
-		// printf("Weights ARRAY: %s\n", PyUnicode_AsUTF8(weightsRepr));
 		
 		// // print weights
 		// printf("\n----------\n");
@@ -345,8 +434,8 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 		updateInterval = leftCount*10;
 	}
 	size_t totalIterations = leftCount*(leftCount-1)/2;
+	npy_int64 iterations = -1;
 	if(leftEdgesArray == NULL) {
-		npy_int64 iterations = -1;
 		for(size_t i = 0; i < leftCount; i++) {
 			if(CVUnlikely(errorOccured)){
 				break;
@@ -354,9 +443,6 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 			for(size_t j = i+1; j < leftCount; j++) {
 				iterations++;
 				if(iterations % updateInterval == 0) {
-					// printf("\r%ld/%ld", i, leftCount);
-					// fflush(stdout);
-					// if defined, call updateCallback with 2 parameters, current and total
 					if (updateCallback != NULL) {
 						PyObject *result = PyObject_CallFunction(updateCallback, "nn", iterations, totalIterations);
 						if (result == NULL) {
@@ -365,135 +451,63 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 						}
 						Py_XDECREF(result);
 					}
-					// python checks to see if the process is interrupted by error
 					if (PyErr_CheckSignals() != 0) {
 						errorOccured = CVTrue;
 						break;
 					}
 				}
-
-
 				size_t leftNode1Start = leftNodeStartEndIndices[i];
 				size_t leftNode1End = leftNodeStartEndIndices[i+1];
-				size_t leftNode1Degree = leftNode1End - leftNode1Start;
-				// calculate the dot product
-				double dotProduct = 0.0;
 				size_t leftNode2Start = leftNodeStartEndIndices[j];
 				size_t leftNode2End = leftNodeStartEndIndices[j+1];
-				size_t leftNode2Degree = leftNode2End - leftNode2Start;
-
-				size_t leftNode1Index = leftNode1Start;
-				size_t leftNode2Index = leftNode2Start;
-				while (leftNode1Index < leftNode1End && leftNode2Index < leftNode2End) {
-					npy_int64 rightNode1 = uniqueEdges[2 * leftNode1Index + 1];
-					npy_int64 rightNode2 = uniqueEdges[2 * leftNode2Index + 1];
-					if (rightNode1 == rightNode2) { 
-						dotProduct += uniqueEdgesWeight[leftNode1Index] * uniqueEdgesWeight[leftNode2Index];
-						leftNode1Index++;
-						leftNode2Index++;
-					} else if (rightNode1 < rightNode2) {
-						leftNode1Index++;
-					} else {
-						leftNode2Index++;
-					}
-				}
-				double similarity = dotProduct*normalizationFactor[i]*normalizationFactor[j];
-				if (similarity > threshold) {
-					if(returnDictionary){
-						PyObject *key = PyTuple_Pack(2, PyLong_FromLong(i), PyLong_FromLong(j));
-						PyObject *value = PyFloat_FromDouble(similarity);
-						PyDict_SetItem(similaritiesDict, key, value);
-						Py_XDECREF(key);
-						Py_XDECREF(value);
-					}else{
-						if (CVUnlikely(similaritiesCount == similaritiesCapacity)) {
-							similaritiesCapacity *= 2;
-							aboveThresholdEdges = (npy_int64 *)realloc(aboveThresholdEdges, similaritiesCapacity * 2 * sizeof(npy_int64));
-							similarities = (double *)realloc(similarities, similaritiesCapacity * sizeof(double));
-						}
-						aboveThresholdEdges[2 * similaritiesCount] = i;
-						aboveThresholdEdges[2 * similaritiesCount + 1] = j;
-						similarities[similaritiesCount] = similarity;
-						similaritiesCount++;
+					double dotProduct = compute_dot_product(
+						leftNode1Start, leftNode1End,
+						leftNode2Start, leftNode2End,
+						uniqueEdges, uniqueEdgesWeight);
+					double similarity = dotProduct*normalizationFactor[i]*normalizationFactor[j];
+					if (process_similarity_result(i, j, similarity, threshold, returnDictionary, similaritiesDict,
+						&aboveThresholdEdges, &similarities, &similaritiesCount, &similaritiesCapacity)) {
+						errorOccured = CVTrue;
+						break;
 					}
 				}
 			}
-		}
-	}else{
+		} else {
 		totalIterations = leftEdgeCount;
-		npy_int64 iterations = -1;
 		for(size_t leftEdgeIndex = 0; leftEdgeIndex < leftEdgeCount; leftEdgeIndex++) {
 			size_t i = leftEdges[2 * leftEdgeIndex];
 			size_t j = leftEdges[2 * leftEdgeIndex + 1];
-			{
-				iterations++;
-				if(iterations % updateInterval == 0) {
-					// printf("\r%ld/%ld", i, leftCount);
-					// fflush(stdout);
-					// if defined, call updateCallback with 2 parameters, current and total
-					if (updateCallback != NULL) {
-						PyObject *result = PyObject_CallFunction(updateCallback, "nn", iterations, totalIterations);
-						if (result == NULL) {
-							errorOccured = CVTrue;
-							break;
-						}
-						Py_XDECREF(result);
-					}
-					// python checks to see if the process is interrupted
-					if (PyErr_CheckSignals() != 0) {
+			iterations++;
+			if(iterations % updateInterval == 0) {
+				if (updateCallback != NULL) {
+					PyObject *result = PyObject_CallFunction(updateCallback, "nn", iterations, totalIterations);
+					if (result == NULL) {
 						errorOccured = CVTrue;
 						break;
 					}
+					Py_XDECREF(result);
 				}
-
-
-				size_t leftNode1Start = leftNodeStartEndIndices[i];
-				size_t leftNode1End = leftNodeStartEndIndices[i+1];
-				size_t leftNode1Degree = leftNode1End - leftNode1Start;
-				// calculate the dot product
-				double dotProduct = 0.0;
-				size_t leftNode2Start = leftNodeStartEndIndices[j];
-				size_t leftNode2End = leftNodeStartEndIndices[j+1];
-				size_t leftNode2Degree = leftNode2End - leftNode2Start;
-
-				size_t leftNode1Index = leftNode1Start;
-				size_t leftNode2Index = leftNode2Start;
-				while (leftNode1Index < leftNode1End && leftNode2Index < leftNode2End) {
-					npy_int64 rightNode1 = uniqueEdges[2 * leftNode1Index + 1];
-					npy_int64 rightNode2 = uniqueEdges[2 * leftNode2Index + 1];
-					if (rightNode1 == rightNode2) { 
-						dotProduct += uniqueEdgesWeight[leftNode1Index] * uniqueEdgesWeight[leftNode2Index];
-						leftNode1Index++;
-						leftNode2Index++;
-					} else if (rightNode1 < rightNode2) {
-						leftNode1Index++;
-					} else {
-						leftNode2Index++;
-					}
+				if (PyErr_CheckSignals() != 0) {
+					errorOccured = CVTrue;
+					break;
 				}
+			}
+			size_t leftNode1Start = leftNodeStartEndIndices[i];
+			size_t leftNode1End = leftNodeStartEndIndices[i+1];
+			size_t leftNode2Start = leftNodeStartEndIndices[j];
+			size_t leftNode2End = leftNodeStartEndIndices[j+1];
+				double dotProduct = compute_dot_product(
+					leftNode1Start, leftNode1End,
+					leftNode2Start, leftNode2End,
+					uniqueEdges, uniqueEdgesWeight);
 				double similarity = dotProduct*normalizationFactor[i]*normalizationFactor[j];
-				if (similarity > threshold) {
-					if(returnDictionary){
-						PyObject *key = PyTuple_Pack(2, PyLong_FromLong(i), PyLong_FromLong(j));
-						PyObject *value = PyFloat_FromDouble(similarity);
-						PyDict_SetItem(similaritiesDict, key, value);
-						Py_XDECREF(key);
-						Py_XDECREF(value);
-					}else{
-						if (CVUnlikely(similaritiesCount == similaritiesCapacity)) {
-							similaritiesCapacity *= 2;
-							aboveThresholdEdges = (npy_int64 *)realloc(aboveThresholdEdges, similaritiesCapacity * 2 * sizeof(npy_int64));
-							similarities = (double *)realloc(similarities, similaritiesCapacity * sizeof(double));
-						}
-						aboveThresholdEdges[2 * similaritiesCount] = i;
-						aboveThresholdEdges[2 * similaritiesCount + 1] = j;
-						similarities[similaritiesCount] = similarity;
-						similaritiesCount++;
-					}
+				if (process_similarity_result(i, j, similarity, threshold, returnDictionary, similaritiesDict,
+					&aboveThresholdEdges, &similarities, &similaritiesCount, &similaritiesCapacity)) {
+					errorOccured = CVTrue;
+					break;
 				}
 			}
 		}
-	}
 
 
 	Py_XDECREF(edgesArray);
@@ -515,6 +529,7 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 		// clean up
 		free(aboveThresholdEdges);
 		free(similarities);
+		Py_XDECREF(similaritiesDict);
 		
 		return NULL;
 	}

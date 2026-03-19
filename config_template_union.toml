@@ -57,11 +57,11 @@ weight = 0.80
 [indicator.courl.thresholds]
 weight = 0.80
 [indicator.coword.thresholds]
-weight = 0.85
+weight = 0.80
 [indicator.textsimilarity.thresholds]
-weight = 0.85
+weight = 0.80
 [indicator.usctextsimilarity.thresholds]
-weight = 0.85
+weight = 0.80
 # example to also include a threshold on similarity
 # similarity = 0.5
 
