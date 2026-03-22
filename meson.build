@@ -11,7 +11,7 @@ project('coordinationz',
                 # 'b_sanitize=address',  # Enable AddressSanitizer
                 # 'b_lundef=false',
                 ],
-        version:'0.2.1',
+        version:'0.2.2',
         license:'MIT',
         )
 

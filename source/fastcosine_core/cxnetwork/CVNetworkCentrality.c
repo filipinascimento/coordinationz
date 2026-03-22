@@ -43,7 +43,7 @@ CVBool CVNetworkCalculateCentrality_weighted_parallel_implementation(const CVNet
 	
 	CVParallelForStart(centralityLoop, blockIndex, unrolledLoops){
 		
-		const CVDouble* verticesWeights = network->verticesWeights;
+		const CVFloat* verticesWeights = network->verticesWeights;
 		const CVBool* verticesEnabled = network->verticesEnabled;
 		
 		CVUIntegerArray* P = calloc(verticesCount, sizeof(CVUIntegerArray));
@@ -499,7 +499,7 @@ CVBool CVNetworkCalculateCentrality_implementation(const CVNetwork* network,CVDo
 		}
 	}
 	
-	const CVDouble* verticesWeights = network->verticesWeights;
+	const CVFloat* verticesWeights = network->verticesWeights;
 	const CVBool* verticesEnabled = network->verticesEnabled;
 	
 	CVDouble* centralityData = centrality->data;
@@ -696,7 +696,7 @@ CVBool CVNetworkCalculateStressCentrality_parallel_implementation(const CVNetwor
 	CVParallelForStart(centralityLoop, blockIndex, unrolledLoops){
 		
 		
-		const CVDouble* verticesWeights = network->verticesWeights;
+		const CVFloat* verticesWeights = network->verticesWeights;
 		const CVBool* verticesEnabled = network->verticesEnabled;
 		
 		CVUIntegerArray* P = calloc(verticesCount, sizeof(CVUIntegerArray));
@@ -826,7 +826,7 @@ CVBool CVNetworkCalculateStressCentrality_implementation(const CVNetwork* networ
 		}
 	}
 	
-	const CVDouble* verticesWeights = network->verticesWeights;
+	const CVFloat* verticesWeights = network->verticesWeights;
 	const CVBool* verticesEnabled = network->verticesEnabled;
 	
 	CVDouble* centralityData = centrality->data;
