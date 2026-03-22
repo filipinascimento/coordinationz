@@ -191,9 +191,10 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	// lists are also supported
 	// Check if edgesObject is a numpy array
 	if (PyArray_Check(edgesObject)) {
+		PyArrayObject *edgesObjectArray = (PyArrayObject *)edgesObject;
 		// Check if the numpy array is of type int64 and contiguous
-		if (PyArray_TYPE(edgesObject) == NPY_INT64 && PyArray_IS_C_CONTIGUOUS(edgesObject)) {
-			edgesArray = (PyArrayObject *)edgesObject;
+		if (PyArray_TYPE(edgesObjectArray) == NPY_INT64 && PyArray_IS_C_CONTIGUOUS(edgesObjectArray)) {
+			edgesArray = edgesObjectArray;
 			Py_INCREF(edgesArray);
 			// printf("edgesArray is a numpy array of int64 and contiguous...\n");
 		} else {
@@ -216,9 +217,10 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 	if(weightsObject!=NULL && weightsObject!=Py_None){
 		// convert weightsObject to numpy array of doubles if needed (will be readonly)
 		if (PyArray_Check(weightsObject)) {
+			PyArrayObject *weightsObjectArray = (PyArrayObject *)weightsObject;
 			// Check if the numpy array is of type double and contiguous
-			if (PyArray_TYPE(weightsObject) == NPY_FLOAT64 && PyArray_IS_C_CONTIGUOUS(weightsObject)) {
-				weightsArray = (PyArrayObject *)weightsObject;
+			if (PyArray_TYPE(weightsObjectArray) == NPY_FLOAT64 && PyArray_IS_C_CONTIGUOUS(weightsObjectArray)) {
+				weightsArray = weightsObjectArray;
 				Py_INCREF(weightsArray);
 				// printf("edgesArray is a numpy array of double and contiguous...\n");
 			} else {
@@ -258,9 +260,10 @@ static PyObject *cosine(PyObject *self, PyObject *args, PyObject *kwds) {
 
 	if (leftEdgesObject != NULL && leftEdgesObject != Py_None) {
 		if (PyArray_Check(leftEdgesObject)) {
+			PyArrayObject *leftEdgesObjectArray = (PyArrayObject *)leftEdgesObject;
 			// Check if the numpy array is of type int64 and contiguous
-			if (PyArray_TYPE(leftEdgesObject) == NPY_INT64 && PyArray_ISCONTIGUOUS(leftEdgesObject)) {
-				leftEdgesArray = (PyArrayObject *)leftEdgesObject;
+			if (PyArray_TYPE(leftEdgesObjectArray) == NPY_INT64 && PyArray_ISCONTIGUOUS(leftEdgesObjectArray)) {
+				leftEdgesArray = leftEdgesObjectArray;
 				Py_INCREF(leftEdgesArray);
 				// printf("leftEdgesArray is a numpy array of int64 and contiguous...\n");
 			} else {
