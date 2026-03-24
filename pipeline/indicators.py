@@ -338,17 +338,6 @@ if __name__ == "__main__": # Needed for parallel processing
                 user2category = dict(dfFiltered[["user_id","category"]].drop_duplicates().values)
                 g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
 
-            # Create a network from the null model output with a pvalue threshold of 0.05
-            g = cznet.createNetworkFromNullModelOutput(
-                nullModelOutput,
-                **runParameters["network"][networkName]
-            )
-            
-        if("category" in dfFiltered.columns):
-            # dictionary
-            user2category = dict(dfFiltered[["user_id","category"]].drop_duplicates().values)
-            g.vs["category"] = [user2category.get(user,"None") for user in g.vs["Label"]]
-
         # g = cznet.removeSingletons(g)
 
         gThresholded = cznet.thresholdNetwork(g, **runParameters["threshold"][networkName])
